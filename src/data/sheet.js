@@ -6,6 +6,9 @@ export const AGE_URL = import.meta.env.VITE_SHEET_AGE_CSV;
 export const TEAMS_URL = import.meta.env.VITE_SHEET_TEAMS_CSV;
 export const PLAYERS_URL = import.meta.env.VITE_SHEET_PLAYERS_CSV;
 
+// ✅ nuevo
+export const KPIS_GENDER_URL = import.meta.env.VITE_SHEET_KPIS_GENDER_CSV;
+
 export function assertEnv() {
   const missing = [];
   if (!KPIS_URL) missing.push("VITE_SHEET_KPIS_CSV");
@@ -13,6 +16,9 @@ export function assertEnv() {
   if (!AGE_URL) missing.push("VITE_SHEET_AGE_CSV");
   if (!TEAMS_URL) missing.push("VITE_SHEET_TEAMS_CSV");
   if (!PLAYERS_URL) missing.push("VITE_SHEET_PLAYERS_CSV");
+
+  // ✅ nuevo
+  if (!KPIS_GENDER_URL) missing.push("VITE_SHEET_KPIS_GENDER_CSV");
 
   if (missing.length) {
     throw new Error(
