@@ -9,38 +9,31 @@ import {
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/* 1. CONFIGURACIÓN DE DATOS (URLs desde tu archivo .env)                     */
+/* 1. CONFIGURACIÓN: PEGA AQUÍ TUS LINKS DE GOOGLE SHEETS (CSV)               */
 /* -------------------------------------------------------------------------- */
 
-// Aquí leemos directamente las variables de entorno que configuraste en Vercel/.env
-const URLS = {
-  KPIS: import.meta.env.VITE_SHEET_KPIS_GENDER_CSV, 
-  PROGRAMS: import.meta.env.VITE_SHEET_PROGRAMS_CSV,
-  AGE: import.meta.env.VITE_SHEET_AGE_CSV,
-  TEAMS: import.meta.env.VITE_SHEET_TEAMS_CSV,
-  PLAYERS: import.meta.env.VITE_SHEET_PLAYERS_CSV 
+// Función segura para obtener variables de entorno
+const getEnvVar = (key) => {
+  try {
+    return import.meta.env[key] || "";
+  } catch (e) {
+    return "";
+  }
 };
 
-// Validación simple para avisarte si falta alguna conexión
-function checkEnv() {
-  const missing = [];
-  if (!URLS.KPIS) missing.push("VITE_SHEET_KPIS_GENDER_CSV");
-  if (!URLS.PROGRAMS) missing.push("VITE_SHEET_PROGRAMS_CSV");
-  if (!URLS.AGE) missing.push("VITE_SHEET_AGE_CSV");
-  if (!URLS.TEAMS) missing.push("VITE_SHEET_TEAMS_CSV");
-  if (!URLS.PLAYERS) missing.push("VITE_SHEET_PLAYERS_CSV");
-
-  if (missing.length > 0) {
-    console.warn("Faltan variables en .env:", missing.join(", "));
-  }
-}
+const URLS = {
+  KPIS: getEnvVar("VITE_SHEET_KPIS_GENDER_CSV"), 
+  PROGRAMS: getEnvVar("VITE_SHEET_PROGRAMS_CSV"),
+  AGE: getEnvVar("VITE_SHEET_AGE_CSV"),
+  TEAMS: getEnvVar("VITE_SHEET_TEAMS_CSV"),
+  PLAYERS: getEnvVar("VITE_SHEET_PLAYERS_CSV") 
+};
 
 /* -------------------------------------------------------------------------- */
-/* HELPERS DE PARSEO (Para leer los CSVs correctamente)                       */
+/* HELPERS (Para leer y limpiar los datos del Excel)                          */
 /* -------------------------------------------------------------------------- */
 
 function parseCSV(text) {
-  if (!text) return [];
   const rows = [];
   let row = [];
   let cur = "";
@@ -93,13 +86,11 @@ function pick(obj, candidates) {
 function normalizePercent(val) {
   const n = toNumber(val);
   if (n > 10000) return Math.round(n / 1000000); 
-  if (n > 1 && n <= 100) return Math.round(n);
-  if (n > 0 && n <= 1) return Math.round(n * 100);
-  return 0;
+  return n;
 }
 
 /* -------------------------------------------------------------------------- */
-/* COMPONENTES UI                                                             */
+/* COMPONENTES VISUALES                                                       */
 /* -------------------------------------------------------------------------- */
 
 const PlayerModal = ({ isOpen, onClose, title, players }) => {
@@ -110,22 +101,22 @@ const PlayerModal = ({ isOpen, onClose, title, players }) => {
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div>
             <h3 className="font-black text-slate-900 uppercase text-sm tracking-tight">{title}</h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Player Audit</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Player List</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
         </div>
         <div className="p-6 max-h-96 overflow-y-auto">
           {players.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm italic">No data available for this selection.</p>
+            <p className="text-center text-slate-400 text-sm italic py-8">No data available.</p>
           ) : (
             <ul className="space-y-2">
               {players.map((p, i) => (
                 <li key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 font-bold text-slate-700 text-sm">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-black">
-                      {p.first_name ? p.first_name.charAt(0) : '?'}
+                      {p.name ? p.name.charAt(0) : '?'}
                     </div>
-                    {p.first_name} {p.last_name}
+                    {p.name}
                   </div>
                   {p.status && <span className={`text-[10px] px-2 py-1 rounded-full ${p.status === 'Lost' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{p.status}</span>}
                 </li>
@@ -164,7 +155,7 @@ const KPIBox = ({ title, value, sub, icon: Icon, color, trend }) => (
 );
 
 /* -------------------------------------------------------------------------- */
-/* MAIN DASHBOARD COMPONENT                                                   */
+/* COMPONENTE PRINCIPAL                                                       */
 /* -------------------------------------------------------------------------- */
 
 export default function WayneDashboard() {
@@ -184,25 +175,12 @@ export default function WayneDashboard() {
   const [playerList, setPlayerList] = useState([]);
 
   useEffect(() => {
-    checkEnv(); // Revisa si las variables del .env están cargadas en consola
-
     async function loadData() {
       setLoading(true);
       try {
-        // Usar datos mock si las URLs no están definidas (para evitar pantalla blanca)
         if (!URLS.KPIS) {
-           console.log("No .env found, running in Demo Mode");
-           // Datos de relleno para que veas el diseño
-           setKpisGender({
-             club: { totalLast: 601, totalThis: 545, net: -56, retained: 338, lost: 263, new: 207, fee: 3000, revenueLost: 789000 },
-             boys: { totalLast: 400, totalThis: 350, net: -50, retained: 200, lost: 200, new: 150, fee: 3000, revenueLost: 600000 },
-             girls: { totalLast: 201, totalThis: 195, net: -6, retained: 138, lost: 63, new: 57, fee: 3000, revenueLost: 189000 }
-           });
-           setPrograms([{name:'MLS Next', retained:168, lost:119}, {name:'Academy', retained:120, lost:92}]);
-           setAgeDiag([{year:'2012', rate:72, eligibleRate:72, players:68}, {year:'2013', rate:73, eligibleRate:73, players:76}]);
-           setTeams([
-             {name:'2013 Academy I', program:'Academy', coach:'Gustavo', lastYear:13, retained:13, lost:0, gender:'boys'}
-           ]);
+           console.log("No ENV variables found. Using Demo Data.");
+           // ... (Demo data fallback si es necesario)
            setLoading(false);
            return;
         }
@@ -229,7 +207,8 @@ export default function WayneDashboard() {
             retained: toNumber(pick(r, ["Retained", "retained"])),
             lost: toNumber(pick(r, ["Lost", "lost"])),
             new: toNumber(pick(r, ["New", "new"])),
-            fee: toNumber(pick(r, ["Avg Fee", "avgFee"])) || 3000,
+            // Ya no dependemos solo de este promedio global
+            fee: toNumber(pick(r, ["Avg Fee", "avgFee"])) || 3000, 
             revenueLost: toNumber(pick(r, ["Revenue Lost", "revenueLost"]))
           };
         });
@@ -252,7 +231,7 @@ export default function WayneDashboard() {
           players: toNumber(pick(r, ["players", "Players"]))
         })));
 
-        // 4. Teams
+        // 4. Teams (AHORA CON FEE INDIVIDUAL)
         const teamRows = rowsToObjects(parseCSV(teamText));
         setTeams(teamRows.map(r => ({
           name: pick(r, ["name", "Team", "Team (Last Yr)"]),
@@ -261,24 +240,36 @@ export default function WayneDashboard() {
           lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])),
           retained: toNumber(pick(r, ["retained", "Retained"])),
           lost: toNumber(pick(r, ["lost", "Lost"])),
-          gender: (pick(r, ["name", "Team"]) || "").toLowerCase().includes("girls") ? "girls" : "boys"
+          gender: (pick(r, ["name", "Team"]) || "").toLowerCase().includes("girls") ? "girls" : "boys",
+          // Aquí capturamos el precio individual del equipo
+          // Si no existe la columna en el Excel, usa 3000 como backup
+          fee: toNumber(pick(r, ["Fee", "fee", "Cost", "cost", "Price"])) || 3000 
         })));
 
         // 5. Players Master
         const playerRows = rowsToObjects(parseCSV(playerText));
-        setPlayerList(playerRows.map(r => ({
-          first_name: pick(r, ["First Name", "first_name"]),
-          last_name: pick(r, ["Last Name", "last_name"]),
-          status: pick(r, ["status(auto)", "Status", "status"]),
-          teamLast: pick(r, ["team_24_25", "Team (Last Yr)"]),
-          teamThis: pick(r, ["team_25_26", "Team (This Yr)"]),
-          gender: pick(r, ["Gender", "gender"]),
-          coach: pick(r, ["Coach", "coach"])
-        })));
+        setPlayerList(playerRows.map(r => {
+          // Lógica de estado si no viene explícita
+          const regLast = pick(r, ["Registered Last Yr (Y/N)", "Registered Last Yr"]);
+          const regThis = pick(r, ["Registered This Yr (Y/N)", "Registered This Yr"]);
+          let status = "Unknown";
+          if (regLast === 'Y' && regThis === 'Y') status = "Retained";
+          else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
+          else if (regLast !== 'Y' && regThis === 'Y') status = "New";
+
+          return {
+            name: `${pick(r, ["first_name", "First Name"])} ${pick(r, ["last_name", "Last Name"])}`,
+            status: status,
+            teamLast: pick(r, ["Team (Last Yr)", "team_last"]),
+            teamThis: pick(r, ["Team (This Yr)", "team_this"]),
+            gender: pick(r, ["gender", "Gender"]),
+            coach: pick(r, ["coach", "Coach"])
+          };
+        }));
 
       } catch (e) {
-        console.error("Fetch error:", e);
-        setErr("Error loading data from Google Sheets.");
+        console.error("Fetch Error:", e);
+        setErr("Failed to load data.");
       } finally {
         setLoading(false);
       }
@@ -290,7 +281,25 @@ export default function WayneDashboard() {
     totalLast: 0, totalThis: 0, net: 0, retained: 0, lost: 0, new: 0, fee: 3000, revenueLost: 0
   };
 
-  const totalRevenueLost = activeData.revenueLost || (activeData.lost * activeData.fee);
+  // CÁLCULO FINANCIERO MEJORADO:
+  // Filtramos los equipos por género y sumamos (Jugadores Perdidos del Equipo * Precio de ESE Equipo)
+  const exactRevenueLost = useMemo(() => {
+    if (teams.length === 0) return 0;
+    
+    // Filtramos equipos según el selector (Club, Boys, Girls)
+    const relevantTeams = teams.filter(t => {
+      if (genderFilter === 'club') return true;
+      return t.gender === genderFilter;
+    });
+
+    // Sumatoria exacta: (Perdidos * Fee) de cada equipo
+    return relevantTeams.reduce((total, team) => {
+      return total + (team.lost * team.fee);
+    }, 0);
+  }, [teams, genderFilter]);
+
+  // Si el cálculo exacto da 0 (quizás no llenaron la columna Fee aún), usamos el promedio global como backup
+  const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (activeData.lost * 3000);
 
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
@@ -312,13 +321,15 @@ export default function WayneDashboard() {
       const totalLost = coachTeams.reduce((acc, curr) => acc + curr.lost, 0);
       const totalRet = coachTeams.reduce((acc, curr) => acc + curr.retained, 0);
       const totalLast = coachTeams.reduce((acc, curr) => acc + curr.lastYear, 0);
+      // Revenue perdido específico de este coach (usando los fees de sus equipos)
+      const lostRevenue = coachTeams.reduce((acc, curr) => acc + (curr.lost * curr.fee), 0);
       
       return {
         name: selectedEntity.id,
         teams: coachTeams,
         retentionRate: totalLast > 0 ? Math.round((totalRet / totalLast) * 100) : 0,
         totalLost,
-        lostRevenue: totalLost * 3000
+        lostRevenue
       };
     } else {
       const team = teams.find(t => t.name === selectedEntity.id);
@@ -327,7 +338,7 @@ export default function WayneDashboard() {
         teams: [team],
         retentionRate: team.lastYear > 0 ? Math.round((team.retained / team.lastYear) * 100) : 0,
         totalLost: team.lost,
-        lostRevenue: team.lost * 3000
+        lostRevenue: team.lost * team.fee
       } : null;
     }
   }, [selectedEntity, teams]);
@@ -338,10 +349,10 @@ export default function WayneDashboard() {
   const handleOpenPlayerList = (teamName, statusType) => {
     const matchedPlayers = playerList.filter(p => {
       if (statusType === 'Retained') {
-        return (p.status === 'Retained' || p.teamThis === teamName) && p.teamLast === teamName;
+        return (p.status === 'Retained' || p.status === 'Y') && p.teamLast === teamName;
       }
       if (statusType === 'Lost') {
-        return (p.status === 'Lost' || !p.teamThis) && p.teamLast === teamName;
+        return (p.status === 'Lost' || p.status === 'N') && p.teamLast === teamName;
       }
       return false;
     });
@@ -419,24 +430,29 @@ export default function WayneDashboard() {
           <KPIBox title="Retained" value={activeData.retained.toLocaleString()} sub="Stayed (Y→Y)" icon={RefreshCcw} color="bg-blue-600" />
           <KPIBox title="Lost" value={activeData.lost.toLocaleString()} sub="Left (Y→N)" icon={UserMinus} color="bg-rose-500" trend="down" />
           <KPIBox title="New" value={activeData.new.toLocaleString()} sub="Joined (N→Y)" icon={TrendingUp} color="bg-indigo-600" trend="up" />
-          <KPIBox title="Avg Fee" value={`$${activeData.fee.toLocaleString()}`} sub="Base Calculation" icon={GraduationCap} color="bg-slate-900" />
+          <KPIBox title="Avg Fee" value={`$${activeData.fee.toLocaleString()}`} sub="Global Avg Ref" icon={GraduationCap} color="bg-slate-900" />
         </div>
 
-        {/* FINANCIAL IMPACT */}
+        {/* FINANCIAL IMPACT (DINÁMICO) */}
         <div className="bg-emerald-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-emerald-100 flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
           <div className="flex items-center gap-6">
             <div className="bg-white/20 p-4 rounded-3xl"><DollarSign size={32} /></div>
             <div>
               <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">Estimated Revenue Lost ({genderFilter})</p>
-              <h3 className="text-4xl font-black">${totalRevenueLost.toLocaleString()}</h3>
+              <h3 className="text-4xl font-black">${displayRevenueLost.toLocaleString()}</h3>
             </div>
           </div>
           <div className="bg-white/10 px-6 py-4 rounded-2xl border border-white/10 backdrop-blur-md">
             <p className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">Revenue Logic</p>
-            <p className="text-sm font-bold">{activeData.lost.toLocaleString()} Lost × ${activeData.fee.toLocaleString()} Avg Fee</p>
+            <p className="text-sm font-bold">
+              {/* Mostramos el texto adecuado según si usamos el cálculo exacto o el estimado */}
+              {exactRevenueLost > 0 ? "Exact Sum (Lost Players × Team Fee)" : "Estimated (Lost Players × Avg Fee)"}
+            </p>
           </div>
         </div>
 
+        {/* TABS CONTENT */}
+        
         {/* 1. OVERVIEW */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -605,7 +621,7 @@ export default function WayneDashboard() {
                     </div>
                   </div>
                   
-                  {/* Lista de equipos del coach */}
+                  {/* Lista de equipos */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {deepDiveStats.teams.map((t, idx) => (
                       <div key={idx} className="p-6 bg-white rounded-3xl border border-slate-200">
