@@ -9,30 +9,38 @@ import {
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/* 1. CONFIGURATION: PASTE YOUR GOOGLE SHEET CSV LINKS HERE                   */
+/* 1. CONFIGURACIÓN DE DATOS (URLs desde tu archivo .env)                     */
 /* -------------------------------------------------------------------------- */
+
+// Aquí leemos directamente las variables de entorno que configuraste en Vercel/.env
 const URLS = {
-  // Sheet: KPIs_Gender
-  KPIS: "PEGA_AQUI_TU_LINK_DE_KPIS_GENDER_CSV", 
-  
-  // Sheet: programs
-  PROGRAMS: "PEGA_AQUI_TU_LINK_DE_PROGRAMS_CSV",
-  
-  // Sheet: age_diagnostic
-  AGE: "PEGA_AQUI_TU_LINK_DE_AGE_DIAGNOSTIC_CSV",
-  
-  // Sheet: teams
-  TEAMS: "PEGA_AQUI_TU_LINK_DE_TEAMS_CSV",
-  
-  // Sheet: PUBLIC_PlayerMaster (or RAW_PlayerMaster)
-  PLAYERS: "PEGA_AQUI_TU_LINK_DE_PLAYER_MASTER_CSV" 
+  KPIS: import.meta.env.VITE_SHEET_KPIS_GENDER_CSV, 
+  PROGRAMS: import.meta.env.VITE_SHEET_PROGRAMS_CSV,
+  AGE: import.meta.env.VITE_SHEET_AGE_CSV,
+  TEAMS: import.meta.env.VITE_SHEET_TEAMS_CSV,
+  PLAYERS: import.meta.env.VITE_SHEET_PLAYERS_CSV 
 };
 
+// Validación simple para avisarte si falta alguna conexión
+function checkEnv() {
+  const missing = [];
+  if (!URLS.KPIS) missing.push("VITE_SHEET_KPIS_GENDER_CSV");
+  if (!URLS.PROGRAMS) missing.push("VITE_SHEET_PROGRAMS_CSV");
+  if (!URLS.AGE) missing.push("VITE_SHEET_AGE_CSV");
+  if (!URLS.TEAMS) missing.push("VITE_SHEET_TEAMS_CSV");
+  if (!URLS.PLAYERS) missing.push("VITE_SHEET_PLAYERS_CSV");
+
+  if (missing.length > 0) {
+    console.warn("Faltan variables en .env:", missing.join(", "));
+  }
+}
+
 /* -------------------------------------------------------------------------- */
-/* HELPERS (CSV Parsing & Cleaning)                                           */
+/* HELPERS DE PARSEO (Para leer los CSVs correctamente)                       */
 /* -------------------------------------------------------------------------- */
 
 function parseCSV(text) {
+  if (!text) return [];
   const rows = [];
   let row = [];
   let cur = "";
@@ -73,7 +81,6 @@ function toNumber(x) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// Helper to find column even with case differences
 function pick(obj, candidates) {
   const keys = Object.keys(obj || {});
   for (const c of candidates) {
@@ -83,21 +90,22 @@ function pick(obj, candidates) {
   return "";
 }
 
-// Normalize percentages (e.g. 46808511 -> 46.8)
 function normalizePercent(val) {
   const n = toNumber(val);
-  if (n > 100) return Math.round(n / 1000000); 
-  return n;
+  if (n > 10000) return Math.round(n / 1000000); 
+  if (n > 1 && n <= 100) return Math.round(n);
+  if (n > 0 && n <= 1) return Math.round(n * 100);
+  return 0;
 }
 
 /* -------------------------------------------------------------------------- */
-/* UI COMPONENTS                                                              */
+/* COMPONENTES UI                                                             */
 /* -------------------------------------------------------------------------- */
 
 const PlayerModal = ({ isOpen, onClose, title, players }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style={{zIndex: 100}}>
       <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div>
@@ -108,16 +116,16 @@ const PlayerModal = ({ isOpen, onClose, title, players }) => {
         </div>
         <div className="p-6 max-h-96 overflow-y-auto">
           {players.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm italic">No data available.</p>
+            <p className="text-center text-slate-400 text-sm italic">No data available for this selection.</p>
           ) : (
             <ul className="space-y-2">
               {players.map((p, i) => (
                 <li key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 font-bold text-slate-700 text-sm">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-black">
-                      {p.name ? p.name.charAt(0) : '?'}
+                      {p.first_name ? p.first_name.charAt(0) : '?'}
                     </div>
-                    {p.name}
+                    {p.first_name} {p.last_name}
                   </div>
                   {p.status && <span className={`text-[10px] px-2 py-1 rounded-full ${p.status === 'Lost' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{p.status}</span>}
                 </li>
@@ -156,7 +164,7 @@ const KPIBox = ({ title, value, sub, icon: Icon, color, trend }) => (
 );
 
 /* -------------------------------------------------------------------------- */
-/* MAIN COMPONENT                                                             */
+/* MAIN DASHBOARD COMPONENT                                                   */
 /* -------------------------------------------------------------------------- */
 
 export default function WayneDashboard() {
@@ -176,11 +184,15 @@ export default function WayneDashboard() {
   const [playerList, setPlayerList] = useState([]);
 
   useEffect(() => {
+    checkEnv(); // Revisa si las variables del .env están cargadas en consola
+
     async function loadData() {
       setLoading(true);
       try {
-        if (!URLS.KPIS || URLS.KPIS.includes("PEGA_AQUI")) {
-           console.log("Demo Mode Active");
+        // Usar datos mock si las URLs no están definidas (para evitar pantalla blanca)
+        if (!URLS.KPIS) {
+           console.log("No .env found, running in Demo Mode");
+           // Datos de relleno para que veas el diseño
            setKpisGender({
              club: { totalLast: 601, totalThis: 545, net: -56, retained: 338, lost: 263, new: 207, fee: 3000, revenueLost: 789000 },
              boys: { totalLast: 400, totalThis: 350, net: -50, retained: 200, lost: 200, new: 150, fee: 3000, revenueLost: 600000 },
@@ -189,12 +201,7 @@ export default function WayneDashboard() {
            setPrograms([{name:'MLS Next', retained:168, lost:119}, {name:'Academy', retained:120, lost:92}]);
            setAgeDiag([{year:'2012', rate:72, eligibleRate:72, players:68}, {year:'2013', rate:73, eligibleRate:73, players:76}]);
            setTeams([
-             {name:'2013 Academy I', program:'Academy', coach:'Gustavo', lastYear:13, retained:13, lost:0, gender:'boys'},
-             {name:'2014 Pre MLS', program:'MLS Next', coach:'Mike', lastYear:30, retained:27, lost:3, gender:'boys'}
-           ]);
-           setPlayerList([
-             {name:'John Doe', status:'Retained', teamLast:'2013 Academy I', coach:'Gustavo'},
-             {name:'Jane Smith', status:'Lost', teamLast:'2014 Pre MLS', coach:'Mike'}
+             {name:'2013 Academy I', program:'Academy', coach:'Gustavo', lastYear:13, retained:13, lost:0, gender:'boys'}
            ]);
            setLoading(false);
            return;
@@ -240,7 +247,7 @@ export default function WayneDashboard() {
         const ageRows = rowsToObjects(parseCSV(ageText));
         setAgeDiag(ageRows.map(r => ({
           year: pick(r, ["year", "Year"]),
-          rate: normalizePercent(pick(r, ["rate", "Rate"])), 
+          rate: normalizePercent(pick(r, ["rate", "Rate"])),
           eligibleRate: normalizePercent(pick(r, ["eligibleRate", "EligibleRate"])),
           players: toNumber(pick(r, ["players", "Players"]))
         })));
@@ -250,27 +257,28 @@ export default function WayneDashboard() {
         setTeams(teamRows.map(r => ({
           name: pick(r, ["name", "Team", "Team (Last Yr)"]),
           program: pick(r, ["program", "Program"]),
-          coach: pick(r, ["coach", "Coach"]) || "Unassigned", 
-          lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])), 
+          coach: pick(r, ["coach", "Coach"]) || "Unassigned",
+          lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])),
           retained: toNumber(pick(r, ["retained", "Retained"])),
           lost: toNumber(pick(r, ["lost", "Lost"])),
-          gender: (pick(r, ["name", "Team"]) || "").includes("Girls") ? "girls" : "boys" 
+          gender: (pick(r, ["name", "Team"]) || "").toLowerCase().includes("girls") ? "girls" : "boys"
         })));
 
         // 5. Players Master
         const playerRows = rowsToObjects(parseCSV(playerText));
         setPlayerList(playerRows.map(r => ({
-          name: `${pick(r, ["First Name", "first_name"])} ${pick(r, ["Last Name", "last_name"])}`,
-          status: pick(r, ["Status", "status"]),
-          teamLast: pick(r, ["Team (Last Yr)", "Team (Last Year)"]),
-          teamThis: pick(r, ["Team (This Yr)", "Team (This Year)"]),
+          first_name: pick(r, ["First Name", "first_name"]),
+          last_name: pick(r, ["Last Name", "last_name"]),
+          status: pick(r, ["status(auto)", "Status", "status"]),
+          teamLast: pick(r, ["team_24_25", "Team (Last Yr)"]),
+          teamThis: pick(r, ["team_25_26", "Team (This Yr)"]),
           gender: pick(r, ["Gender", "gender"]),
           coach: pick(r, ["Coach", "coach"])
         })));
 
       } catch (e) {
-        console.error("Error loading Excel:", e);
-        setErr("Error connecting to Google Sheets.");
+        console.error("Fetch error:", e);
+        setErr("Error loading data from Google Sheets.");
       } finally {
         setLoading(false);
       }
@@ -395,8 +403,8 @@ export default function WayneDashboard() {
           </div>
         </div>
 
-        {/* LOADING STATE */}
-        {loading && <div className="bg-white p-6 rounded-2xl text-center font-bold text-slate-400 animate-pulse mb-8">Loading data from Google Sheets...</div>}
+        {/* LOADING */}
+        {loading && <div className="bg-white p-6 rounded-2xl text-center font-bold text-slate-400 animate-pulse mb-8">Loading live data...</div>}
         {err && <div className="bg-rose-50 p-6 rounded-2xl text-center font-bold text-rose-500 mb-8">{err}</div>}
 
         {/* TOP NUMBERS */}
@@ -429,8 +437,7 @@ export default function WayneDashboard() {
           </div>
         </div>
 
-        {/* TABS CONTENT */}
-        
+        {/* 1. OVERVIEW */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 lg:col-span-2">
@@ -467,6 +474,7 @@ export default function WayneDashboard() {
           </div>
         )}
 
+        {/* 2. DIAGNOSIS */}
         {activeTab === "diagnosis" && (
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
             <h4 className="text-2xl font-black text-slate-900 mb-10">Diagnostic Curve (Age)</h4>
@@ -488,6 +496,7 @@ export default function WayneDashboard() {
           </div>
         )}
 
+        {/* 3. FULL ROSTER */}
         {activeTab === "full-roster" && (
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
