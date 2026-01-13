@@ -1,79 +1,55 @@
-// src/WayneDashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ComposedChart,
-  Line,
-  Area,
-  Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ComposedChart, Line, Area, Legend,
 } from "recharts";
 import {
-  UserMinus,
-  RefreshCcw,
-  TrendingUp,
-  Award,
-  Search,
-  ShieldCheck,
-  GraduationCap,
-  ClipboardList,
-  Briefcase,
-  ChevronRight,
-  DollarSign,
-  Users,
+  UserMinus, RefreshCcw, TrendingUp, Award, Search, ShieldCheck,
+  GraduationCap, ClipboardList, Briefcase, ChevronRight, DollarSign, X, Users, Target
 } from "lucide-react";
 
-import { KPIS_URL, PROGRAMS_URL, AGE_URL, TEAMS_URL, PLAYERS_URL, assertEnv } from "./data/sheet";
-import { fetchKpisGender } from "./data/kpisGender";
+/* -------------------------------------------------------------------------- */
+/* 1. CONFIGURATION: PASTE YOUR GOOGLE SHEET CSV LINKS HERE                   */
+/* -------------------------------------------------------------------------- */
+const URLS = {
+  // Sheet: KPIs_Gender
+  KPIS: "PEGA_AQUI_TU_LINK_DE_KPIS_GENDER_CSV", 
+  
+  // Sheet: programs
+  PROGRAMS: "PEGA_AQUI_TU_LINK_DE_PROGRAMS_CSV",
+  
+  // Sheet: age_diagnostic
+  AGE: "PEGA_AQUI_TU_LINK_DE_AGE_DIAGNOSTIC_CSV",
+  
+  // Sheet: teams
+  TEAMS: "PEGA_AQUI_TU_LINK_DE_TEAMS_CSV",
+  
+  // Sheet: PUBLIC_PlayerMaster (or RAW_PlayerMaster)
+  PLAYERS: "PEGA_AQUI_TU_LINK_DE_PLAYER_MASTER_CSV" 
+};
 
-/* -----------------------------
-   Helpers CSV (simple)
-------------------------------*/
+/* -------------------------------------------------------------------------- */
+/* HELPERS (CSV Parsing & Cleaning)                                           */
+/* -------------------------------------------------------------------------- */
+
 function parseCSV(text) {
   const rows = [];
   let row = [];
   let cur = "";
   let inQuotes = false;
-
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     const next = text[i + 1];
-
-    if (ch === '"' && inQuotes && next === '"') {
-      cur += '"';
-      i++;
-      continue;
-    }
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
-    if (ch === "," && !inQuotes) {
-      row.push(cur);
-      cur = "";
-      continue;
-    }
+    if (ch === '"' && inQuotes && next === '"') { cur += '"'; i++; continue; }
+    if (ch === '"') { inQuotes = !inQuotes; continue; }
+    if (ch === "," && !inQuotes) { row.push(cur); cur = ""; continue; }
     if ((ch === "\n" || ch === "\r") && !inQuotes) {
       if (ch === "\r" && next === "\n") i++;
-      row.push(cur);
-      rows.push(row);
-      row = [];
-      cur = "";
-      continue;
+      row.push(cur); rows.push(row); row = []; cur = ""; continue;
     }
     cur += ch;
   }
-
-  if (cur.length || row.length) {
-    row.push(cur);
-    rows.push(row);
-  }
-
+  if (cur.length || row.length) { row.push(cur); rows.push(row); }
   return rows.filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
 }
 
@@ -84,31 +60,20 @@ function rowsToObjects(rows) {
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const obj = {};
-    headers.forEach((h, idx) => {
-      obj[h] = r[idx] ?? "";
-    });
+    headers.forEach((h, idx) => { obj[h] = r[idx] ?? ""; });
     out.push(obj);
   }
   return out;
 }
 
 function toNumber(x) {
-  const clean = String(x ?? "")
-    .replace(/\$/g, "")
-    .replace(/,/g, "")
-    .replace(/%/g, "")
-    .trim();
+  if (typeof x === "number") return x;
+  const clean = String(x ?? "").replace(/\$/g, "").replace(/,/g, "").replace(/%/g, "").trim();
   const n = Number(clean);
   return Number.isFinite(n) ? n : 0;
 }
 
-function normGender(x) {
-  const g = String(x || "").toLowerCase().trim();
-  if (g.startsWith("b") || g.startsWith("m")) return "boys";
-  if (g.startsWith("g") || g.startsWith("f")) return "girls";
-  return "club";
-}
-
+// Helper to find column even with case differences
 function pick(obj, candidates) {
   const keys = Object.keys(obj || {});
   for (const c of candidates) {
@@ -118,54 +83,89 @@ function pick(obj, candidates) {
   return "";
 }
 
-/* -----------------------------
-   UI components
-------------------------------*/
+// Normalize percentages (e.g. 46808511 -> 46.8)
+function normalizePercent(val) {
+  const n = toNumber(val);
+  if (n > 100) return Math.round(n / 1000000); 
+  return n;
+}
+
+/* -------------------------------------------------------------------------- */
+/* UI COMPONENTS                                                              */
+/* -------------------------------------------------------------------------- */
+
+const PlayerModal = ({ isOpen, onClose, title, players }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div>
+            <h3 className="font-black text-slate-900 uppercase text-sm tracking-tight">{title}</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Player Audit</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
+        </div>
+        <div className="p-6 max-h-96 overflow-y-auto">
+          {players.length === 0 ? (
+            <p className="text-center text-slate-400 text-sm italic">No data available.</p>
+          ) : (
+            <ul className="space-y-2">
+              {players.map((p, i) => (
+                <li key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 font-bold text-slate-700 text-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-black">
+                      {p.name ? p.name.charAt(0) : '?'}
+                    </div>
+                    {p.name}
+                  </div>
+                  {p.status && <span className={`text-[10px] px-2 py-1 rounded-full ${p.status === 'Lost' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{p.status}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="p-4 bg-slate-50 text-center border-t border-slate-100">
+          <button onClick={onClose} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Scorecard = ({ label, value, sub, highlight, colorClass = "" }) => (
-  <div
-    className={`p-8 rounded-[2rem] flex flex-col justify-center ${
-      highlight ? "bg-slate-900 text-white shadow-xl" : "bg-white border border-slate-100"
-    }`}
-  >
-    <span className="text-[10px] font-black uppercase tracking-[0.2em] mb-3 text-slate-400">
-      {label}
-    </span>
+  <div className={`p-8 rounded-[2rem] flex flex-col justify-center transition-all duration-300 ${highlight ? "bg-slate-900 text-white shadow-xl scale-105" : "bg-white border border-slate-100"}`}>
+    <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-3 ${highlight ? "text-slate-400" : "text-slate-400"}`}>{label}</span>
     <span className={`text-5xl font-black leading-none ${colorClass}`}>{value}</span>
-    <span className={`text-xs font-bold mt-3 uppercase tracking-wider ${highlight ? "text-slate-500" : "text-slate-400"}`}>
-      {sub}
-    </span>
+    <span className={`text-xs font-bold mt-3 uppercase tracking-wider ${highlight ? "text-slate-500" : "text-slate-400"}`}>{sub}</span>
   </div>
 );
 
 const KPIBox = ({ title, value, sub, icon: Icon, color, trend }) => (
   <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
     <div className="flex items-start justify-between">
-      <div className={`p-2 rounded-lg ${color} text-white`}>
-        <Icon size={20} />
-      </div>
+      <div className={`p-2 rounded-lg ${color} text-white`}><Icon size={20} /></div>
       <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Exec Metric</span>
     </div>
     <div className="mt-4">
       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{title}</p>
       <h3 className="text-3xl font-black text-slate-900">{value}</h3>
-      <p className={`text-xs mt-1 font-bold ${trend === "up" ? "text-emerald-500" : trend === "down" ? "text-rose-500" : "text-slate-400"}`}>
-        {sub}
-      </p>
+      <p className={`text-xs mt-1 font-bold ${trend === "up" ? "text-emerald-500" : trend === "down" ? "text-rose-500" : "text-slate-400"}`}>{sub}</p>
     </div>
   </div>
 );
 
-/* -----------------------------
-   Main component
-------------------------------*/
+/* -------------------------------------------------------------------------- */
+/* MAIN COMPONENT                                                             */
+/* -------------------------------------------------------------------------- */
+
 export default function WayneDashboard() {
-  // valida env (si falta algo, tira error claro)
-  assertEnv();
-
   const [activeTab, setActiveTab] = useState("overview");
-  const [genderFilter, setGenderFilter] = useState("club"); // club | boys | girls
+  const [genderFilter, setGenderFilter] = useState("club");
   const [searchTerm, setSearchTerm] = useState("");
-
+  const [modal, setModal] = useState({ open: false, title: "", players: [] });
+  const [selectedEntity, setSelectedEntity] = useState({ type: 'coach', id: '' });
+  
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -173,138 +173,199 @@ export default function WayneDashboard() {
   const [programs, setPrograms] = useState([]);
   const [ageDiag, setAgeDiag] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [playerList, setPlayerList] = useState([]);
 
-  // 1) KPIs_Gender (Club/Boys/Girls)
   useEffect(() => {
-    let mounted = true;
-    fetchKpisGender()
-      .then((data) => mounted && setKpisGender(data))
-      .catch((e) => console.error("KPIs_Gender error:", e));
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // 2) Load other CSVs (Programs / Age / Teams). (KPIS_URL y PLAYERS_URL quedan listos para futuras features)
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
+    async function loadData() {
       setLoading(true);
-      setErr("");
       try {
-        const urls = [
-          ["programs", PROGRAMS_URL],
-          ["age", AGE_URL],
-          ["teams", TEAMS_URL],
-          // opcional: los traemos igual para chequear que existan
-          ["kpis", KPIS_URL],
-          ["players", PLAYERS_URL],
-        ];
-
-        const results = {};
-        for (const [key, url] of urls) {
-          const res = await fetch(url, { cache: "no-store" });
-          if (!res.ok) throw new Error(`Fetch failed (${key}): ${res.status}`);
-          const text = await res.text();
-          const rows = parseCSV(text);
-          results[key] = rowsToObjects(rows);
+        if (!URLS.KPIS || URLS.KPIS.includes("PEGA_AQUI")) {
+           console.log("Demo Mode Active");
+           setKpisGender({
+             club: { totalLast: 601, totalThis: 545, net: -56, retained: 338, lost: 263, new: 207, fee: 3000, revenueLost: 789000 },
+             boys: { totalLast: 400, totalThis: 350, net: -50, retained: 200, lost: 200, new: 150, fee: 3000, revenueLost: 600000 },
+             girls: { totalLast: 201, totalThis: 195, net: -6, retained: 138, lost: 63, new: 57, fee: 3000, revenueLost: 189000 }
+           });
+           setPrograms([{name:'MLS Next', retained:168, lost:119}, {name:'Academy', retained:120, lost:92}]);
+           setAgeDiag([{year:'2012', rate:72, eligibleRate:72, players:68}, {year:'2013', rate:73, eligibleRate:73, players:76}]);
+           setTeams([
+             {name:'2013 Academy I', program:'Academy', coach:'Gustavo', lastYear:13, retained:13, lost:0, gender:'boys'},
+             {name:'2014 Pre MLS', program:'MLS Next', coach:'Mike', lastYear:30, retained:27, lost:3, gender:'boys'}
+           ]);
+           setPlayerList([
+             {name:'John Doe', status:'Retained', teamLast:'2013 Academy I', coach:'Gustavo'},
+             {name:'Jane Smith', status:'Lost', teamLast:'2014 Pre MLS', coach:'Mike'}
+           ]);
+           setLoading(false);
+           return;
         }
 
-        if (cancelled) return;
+        const responses = await Promise.all([
+          fetch(URLS.KPIS).then(res => res.text()),
+          fetch(URLS.PROGRAMS).then(res => res.text()),
+          fetch(URLS.AGE).then(res => res.text()),
+          fetch(URLS.TEAMS).then(res => res.text()),
+          fetch(URLS.PLAYERS).then(res => res.text()),
+        ]);
 
-        setPrograms(
-          (results.programs || []).map((r) => ({
-            name: pick(r, ["name", "program", "segment"]) || "",
-            retained: toNumber(pick(r, ["retained", "Retained"])),
-            lost: toNumber(pick(r, ["lost", "Lost"])),
-            churn: pick(r, ["churn", "Churn", "churnRate"]) || "",
-          }))
-        );
+        const [kpiText, progText, ageText, teamText, playerText] = responses;
 
-        setAgeDiag(
-          (results.age || []).map((r) => ({
-            year: String(pick(r, ["year", "Year", "birthYear"]) || "").trim(),
-            rate: toNumber(pick(r, ["rate", "Rate"])),
-            eligibleRate: toNumber(pick(r, ["eligibleRate", "EligibleRate", "eligible_rate"])),
-            players: toNumber(pick(r, ["players", "Players", "pool"])),
-            risk: pick(r, ["risk", "Risk"]) || "",
-          }))
-        );
+        // 1. KPIs
+        const kpiRows = rowsToObjects(parseCSV(kpiText));
+        const kpiMap = {};
+        kpiRows.forEach(r => {
+          const key = (pick(r, ["Segment", "segment"]) || "club").toLowerCase();
+          kpiMap[key] = {
+            totalLast: toNumber(pick(r, ["Total 24/25", "totalLastYear"])),
+            totalThis: toNumber(pick(r, ["Total 25/26", "totalThisYear"])),
+            net: toNumber(pick(r, ["Net Change", "netChange"])),
+            retained: toNumber(pick(r, ["Retained", "retained"])),
+            lost: toNumber(pick(r, ["Lost", "lost"])),
+            new: toNumber(pick(r, ["New", "new"])),
+            fee: toNumber(pick(r, ["Avg Fee", "avgFee"])) || 3000,
+            revenueLost: toNumber(pick(r, ["Revenue Lost", "revenueLost"]))
+          };
+        });
+        setKpisGender(kpiMap);
 
-        setTeams(
-          (results.teams || []).map((r) => ({
-            name: pick(r, ["name", "team", "Team"]) || "",
-            program: pick(r, ["program", "segment", "Program"]) || "",
-            coach: pick(r, ["coach", "Coach"]) || "",
-            gender: normGender(pick(r, ["gender", "Gender"])),
-            lastYear: toNumber(pick(r, ["lastYear", "Players Last Year", "playersLastYear"])),
-            retained: toNumber(pick(r, ["retained", "Retained"])),
-            lost: toNumber(pick(r, ["lost", "Lost"])),
-          }))
-        );
+        // 2. Programs
+        const progRows = rowsToObjects(parseCSV(progText));
+        setPrograms(progRows.map(r => ({
+          name: pick(r, ["name", "Name"]),
+          retained: toNumber(pick(r, ["retained", "Retained"])),
+          lost: toNumber(pick(r, ["lost", "Lost"]))
+        })));
+
+        // 3. Age Diagnostic
+        const ageRows = rowsToObjects(parseCSV(ageText));
+        setAgeDiag(ageRows.map(r => ({
+          year: pick(r, ["year", "Year"]),
+          rate: normalizePercent(pick(r, ["rate", "Rate"])), 
+          eligibleRate: normalizePercent(pick(r, ["eligibleRate", "EligibleRate"])),
+          players: toNumber(pick(r, ["players", "Players"]))
+        })));
+
+        // 4. Teams
+        const teamRows = rowsToObjects(parseCSV(teamText));
+        setTeams(teamRows.map(r => ({
+          name: pick(r, ["name", "Team", "Team (Last Yr)"]),
+          program: pick(r, ["program", "Program"]),
+          coach: pick(r, ["coach", "Coach"]) || "Unassigned", 
+          lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])), 
+          retained: toNumber(pick(r, ["retained", "Retained"])),
+          lost: toNumber(pick(r, ["lost", "Lost"])),
+          gender: (pick(r, ["name", "Team"]) || "").includes("Girls") ? "girls" : "boys" 
+        })));
+
+        // 5. Players Master
+        const playerRows = rowsToObjects(parseCSV(playerText));
+        setPlayerList(playerRows.map(r => ({
+          name: `${pick(r, ["First Name", "first_name"])} ${pick(r, ["Last Name", "last_name"])}`,
+          status: pick(r, ["Status", "status"]),
+          teamLast: pick(r, ["Team (Last Yr)", "Team (Last Year)"]),
+          teamThis: pick(r, ["Team (This Yr)", "Team (This Year)"]),
+          gender: pick(r, ["Gender", "gender"]),
+          coach: pick(r, ["Coach", "coach"])
+        })));
+
       } catch (e) {
-        console.error(e);
-        setErr(String(e?.message || e));
+        console.error("Error loading Excel:", e);
+        setErr("Error connecting to Google Sheets.");
       } finally {
         setLoading(false);
       }
     }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
+    loadData();
   }, []);
 
-  // 3) Active KPI numbers (from KPIs_Gender)
   const activeData = kpisGender?.[genderFilter] ?? {
-    totalLastYear: 0,
-    totalThisYear: 0,
-    netChange: 0,
-    retained: 0,
-    lost: 0,
-    new: 0,
-    avgFee: 3000,
-    revenueLost: 0,
+    totalLast: 0, totalThis: 0, net: 0, retained: 0, lost: 0, new: 0, fee: 3000, revenueLost: 0
   };
 
-  const fee = activeData.avgFee || 3000;
-  const totalRevenueLost = activeData.revenueLost || activeData.lost * fee;
+  const totalRevenueLost = activeData.revenueLost || (activeData.lost * activeData.fee);
 
-  // 4) Filter teams table by gender + search
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
-    return (teams || []).filter((t) => {
-      const matchesSearch =
-        (t.name || "").toLowerCase().includes(q) || (t.coach || "").toLowerCase().includes(q);
-      const matchesGender = genderFilter === "club" || t.gender === genderFilter;
+    return teams.filter((t) => {
+      const matchesSearch = (t.name || "").toLowerCase().includes(q) || (t.coach || "").toLowerCase().includes(q);
+      const matchesGender = genderFilter === "club" || (t.gender && t.gender.toLowerCase() === genderFilter);
       return matchesSearch && matchesGender;
     });
   }, [teams, searchTerm, genderFilter]);
 
+  // Deep Dive Logic
+  const deepDiveStats = useMemo(() => {
+    if (!selectedEntity.id) return null;
+    
+    if (selectedEntity.type === 'coach') {
+      const coachTeams = teams.filter(t => t.coach === selectedEntity.id);
+      if (coachTeams.length === 0) return null;
+
+      const totalLost = coachTeams.reduce((acc, curr) => acc + curr.lost, 0);
+      const totalRet = coachTeams.reduce((acc, curr) => acc + curr.retained, 0);
+      const totalLast = coachTeams.reduce((acc, curr) => acc + curr.lastYear, 0);
+      
+      return {
+        name: selectedEntity.id,
+        teams: coachTeams,
+        retentionRate: totalLast > 0 ? Math.round((totalRet / totalLast) * 100) : 0,
+        totalLost,
+        lostRevenue: totalLost * 3000
+      };
+    } else {
+      const team = teams.find(t => t.name === selectedEntity.id);
+      return team ? {
+        name: team.name,
+        teams: [team],
+        retentionRate: team.lastYear > 0 ? Math.round((team.retained / team.lastYear) * 100) : 0,
+        totalLost: team.lost,
+        lostRevenue: team.lost * 3000
+      } : null;
+    }
+  }, [selectedEntity, teams]);
+
+  const uniqueCoaches = useMemo(() => [...new Set(teams.map(t => t.coach).filter(c => c && c !== "Unassigned"))].sort(), [teams]);
+  const uniqueTeams = useMemo(() => [...new Set(teams.map(t => t.name))].sort(), [teams]);
+
+  const handleOpenPlayerList = (teamName, statusType) => {
+    const matchedPlayers = playerList.filter(p => {
+      if (statusType === 'Retained') {
+        return (p.status === 'Retained' || p.teamThis === teamName) && p.teamLast === teamName;
+      }
+      if (statusType === 'Lost') {
+        return (p.status === 'Lost' || !p.teamThis) && p.teamLast === teamName;
+      }
+      return false;
+    });
+
+    setModal({
+      open: true,
+      title: `${statusType}: ${teamName}`,
+      players: matchedPlayers
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+      <PlayerModal isOpen={modal.open} onClose={() => setModal({ ...modal, open: false })} title={modal.title} players={modal.players} />
+
       <div className="max-w-7xl mx-auto">
-        {/* HEADER + GENDER SELECTOR */}
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200 pb-8">
+        
+        {/* HEADER */}
+        <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200 pb-8">
           <div>
             <div className="flex items-center gap-2 mb-2 text-blue-600 font-black uppercase tracking-widest text-[10px]">
               <ShieldCheck size={14} /> Club Intelligence System
             </div>
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">Executive Retention Dashboard</h1>
             <p className="text-slate-500 mt-1 font-medium italic">
-              Totals segmented by <span className="font-bold">Club / Boys / Girls</span>
+              Segmentation: <span className="font-bold">Club / Boys / Girls</span>
             </p>
           </div>
 
           <div className="flex flex-col items-end gap-4">
             <div className="flex bg-slate-200/60 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
-              {[
-                { id: "club", label: "Club Total", icon: ShieldCheck },
-                { id: "boys", label: "Boys Only", icon: Users },
-                { id: "girls", label: "Girls Only", icon: Award },
-              ].map((item) => (
+              {[{ id: "club", label: "Club Total", icon: ShieldCheck }, { id: "boys", label: "Boys Only", icon: Users }, { id: "girls", label: "Girls Only", icon: Award }].map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setGenderFilter(item.id)}
@@ -319,7 +380,7 @@ export default function WayneDashboard() {
             </div>
 
             <nav className="flex bg-slate-200/50 rounded-xl p-1 gap-1">
-              {["overview", "diagnosis", "full-roster"].map((tab) => (
+              {["overview", "diagnosis", "full-roster", "deep-dive"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -332,76 +393,50 @@ export default function WayneDashboard() {
               ))}
             </nav>
           </div>
-        </header>
-
-        {/* STATUS */}
-        {loading && (
-          <div className="bg-white border border-slate-100 rounded-2xl p-5 mb-8 text-slate-600 font-bold">
-            Loading Google Sheet data...
-          </div>
-        )}
-        {err && (
-          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 mb-8 text-rose-700">
-            <div className="font-black uppercase text-xs tracking-widest mb-1">Data Error</div>
-            <div className="font-bold">{err}</div>
-          </div>
-        )}
-
-        {/* TOP NUMBERS (Wayne requirement) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <Scorecard label="2024–25 Total Players" value={activeData.totalLastYear.toLocaleString()} sub="Base Year" />
-          <Scorecard
-            label="2025–26 Total Players"
-            value={activeData.totalThisYear.toLocaleString()}
-            sub="Current Year"
-            colorClass="text-blue-600"
-          />
-          <Scorecard
-            label="Net Change"
-            value={activeData.netChange >= 0 ? `+${activeData.netChange}` : `${activeData.netChange}`}
-            sub="YoY Growth"
-            highlight
-            colorClass="text-emerald-400"
-          />
         </div>
 
-        {/* KPI row */}
+        {/* LOADING STATE */}
+        {loading && <div className="bg-white p-6 rounded-2xl text-center font-bold text-slate-400 animate-pulse mb-8">Loading data from Google Sheets...</div>}
+        {err && <div className="bg-rose-50 p-6 rounded-2xl text-center font-bold text-rose-500 mb-8">{err}</div>}
+
+        {/* TOP NUMBERS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <Scorecard label="2024–25 Total Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
+          <Scorecard label="2025–26 Total Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-600" />
+          <Scorecard label="Net Change" value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} sub="YoY Growth" highlight colorClass="text-emerald-400" />
+        </div>
+
+        {/* KPI ROW */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <KPIBox title="Retained" value={activeData.retained.toLocaleString()} sub="Stayed (Y→Y)" icon={RefreshCcw} color="bg-blue-600" />
           <KPIBox title="Lost" value={activeData.lost.toLocaleString()} sub="Left (Y→N)" icon={UserMinus} color="bg-rose-500" trend="down" />
           <KPIBox title="New" value={activeData.new.toLocaleString()} sub="Joined (N→Y)" icon={TrendingUp} color="bg-indigo-600" trend="up" />
-          <KPIBox title="Avg Fee" value={`$${fee.toLocaleString()}`} sub="Used for revenue impact" icon={GraduationCap} color="bg-slate-900" />
+          <KPIBox title="Avg Fee" value={`$${activeData.fee.toLocaleString()}`} sub="Base Calculation" icon={GraduationCap} color="bg-slate-900" />
         </div>
 
         {/* FINANCIAL IMPACT */}
         <div className="bg-emerald-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-emerald-100 flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
           <div className="flex items-center gap-6">
-            <div className="bg-white/20 p-4 rounded-3xl">
-              <DollarSign size={32} />
-            </div>
+            <div className="bg-white/20 p-4 rounded-3xl"><DollarSign size={32} /></div>
             <div>
-              <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">
-                Estimated Revenue Lost ({genderFilter === "club" ? "Club" : genderFilter})
-              </p>
+              <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">Estimated Revenue Lost ({genderFilter})</p>
               <h3 className="text-4xl font-black">${totalRevenueLost.toLocaleString()}</h3>
             </div>
           </div>
           <div className="bg-white/10 px-6 py-4 rounded-2xl border border-white/10 backdrop-blur-md">
             <p className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">Revenue Logic</p>
-            <p className="text-sm font-bold">
-              {activeData.lost.toLocaleString()} Lost × ${fee.toLocaleString()}
-            </p>
+            <p className="text-sm font-bold">{activeData.lost.toLocaleString()} Lost × ${activeData.fee.toLocaleString()} Avg Fee</p>
           </div>
         </div>
 
-        {/* TABS */}
+        {/* TABS CONTENT */}
+        
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 lg:col-span-2">
               <h4 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-2">
-                <ClipboardList size={22} className="text-blue-600" /> Retention by Program Segment
+                <ClipboardList size={22} className="text-blue-600" /> Retention by Program
               </h4>
-
               <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={programs} layout="vertical" margin={{ left: 30 }}>
@@ -416,35 +451,25 @@ export default function WayneDashboard() {
                 </ResponsiveContainer>
               </div>
             </div>
-
             <div className="bg-slate-900 p-8 rounded-3xl text-white flex flex-col justify-between relative overflow-hidden">
               <div className="relative z-10">
-                <div className="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-3">
-                  Placeholder — coach-level mapping
-                </div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-3">Staff Intelligence</div>
                 <Award className="text-yellow-400 mb-4" size={40} />
-                <h4 className="text-2xl font-black mb-4">Coach Impact Analysis</h4>
+                <h4 className="text-2xl font-black mb-4">Coach Impact</h4>
                 <p className="text-slate-400 text-lg leading-relaxed italic">
-                  Once Teams/Players mapping is finalized, we’ll add retention by coach for{" "}
-                  <span className="text-white font-bold">{genderFilter}</span>.
+                  See individual performance metrics in the "Deep Dive" tab.
                 </p>
               </div>
-              <div className="absolute -right-10 -bottom-10 opacity-10">
-                <ShieldCheck size={200} />
-              </div>
+              <button onClick={() => setActiveTab('deep-dive')} className="relative z-10 w-full py-4 bg-white/10 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-white/20 transition-all">
+                Go to Deep Dive
+              </button>
             </div>
           </div>
         )}
 
         {activeTab === "diagnosis" && (
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-            <div className="mb-10">
-              <h4 className="text-2xl font-black text-slate-900 mb-2">Retention Diagnostic Curve</h4>
-              <p className="text-slate-500 font-medium">
-                Rate = gross retention %. Eligible Rate excludes age-outs/invalid transitions.
-              </p>
-            </div>
-
+            <h4 className="text-2xl font-black text-slate-900 mb-10">Diagnostic Curve (Age)</h4>
             <div className="h-[420px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={ageDiag}>
@@ -454,9 +479,9 @@ export default function WayneDashboard() {
                   <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} />
                   <Tooltip />
                   <Legend verticalAlign="top" align="right" />
-                  <Area yAxisId="left" type="monotone" dataKey="eligibleRate" name="Eligible Rate" fill="#dbeafe" stroke="#3b82f6" strokeWidth={3} />
-                  <Line yAxisId="left" type="monotone" dataKey="rate" name="Rate" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} />
-                  <Bar yAxisId="right" dataKey="players" name="Players" fill="#cbd5e1" barSize={16} radius={[10, 10, 0, 0]} opacity={0.35} />
+                  <Area yAxisId="left" type="monotone" dataKey="eligibleRate" name="Eligible %" fill="#dbeafe" stroke="#3b82f6" strokeWidth={3} />
+                  <Line yAxisId="left" type="monotone" dataKey="rate" name="Gross %" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} />
+                  <Bar yAxisId="right" dataKey="players" name="Total Players" fill="#cbd5e1" barSize={16} radius={[10, 10, 0, 0]} opacity={0.35} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -466,9 +491,7 @@ export default function WayneDashboard() {
         {activeTab === "full-roster" && (
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
-              <h4 className="text-2xl font-black text-slate-900">
-                Team Audit ({genderFilter === "club" ? "Club-wide" : genderFilter})
-              </h4>
+              <h4 className="text-2xl font-black text-slate-900">Team Audit ({genderFilter})</h4>
               <div className="relative w-full md:w-96">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
@@ -480,12 +503,11 @@ export default function WayneDashboard() {
                 />
               </div>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b-2 border-slate-100 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                    <th className="pb-4">Team & Program</th>
+                    <th className="pb-4">Team</th>
                     <th className="pb-4">Coach</th>
                     <th className="pb-4 text-center">Prev</th>
                     <th className="pb-4 text-center">Retained</th>
@@ -497,45 +519,114 @@ export default function WayneDashboard() {
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
                       <td className="py-6">
                         <div className="font-black text-slate-900">{team.name}</div>
-                        <div className="text-[10px] text-blue-600 font-black uppercase tracking-wider">
-                          {team.program}
-                        </div>
+                        <div className="text-[10px] text-blue-600 font-black uppercase tracking-wider">{team.program}</div>
                       </td>
                       <td className="py-6">
                         <div className="flex items-center gap-2 text-slate-500 font-bold">
-                          <Briefcase size={14} className="text-slate-300" /> {team.coach || "Unassigned"}
+                          <Briefcase size={14} className="text-slate-300" /> {team.coach}
                         </div>
                       </td>
-                      <td className="py-6 text-center font-bold text-slate-400">
-                        {team.lastYear ? team.lastYear.toLocaleString() : "-"}
+                      <td className="py-6 text-center font-bold text-slate-400">{team.lastYear}</td>
+                      <td className="py-6 text-center">
+                        <button onClick={() => handleOpenPlayerList(team.name, 'Retained')} className="text-blue-600 font-black hover:underline">{team.retained}</button>
                       </td>
                       <td className="py-6 text-center">
-                        <span className="text-blue-600 font-black">{(team.retained || 0).toLocaleString()}</span>
-                      </td>
-                      <td className="py-6 text-center">
-                        <span className="text-rose-600 font-black">{(team.lost || 0).toLocaleString()}</span>
+                        <button onClick={() => handleOpenPlayerList(team.name, 'Lost')} className="text-rose-600 font-black hover:underline">{team.lost}</button>
                       </td>
                     </tr>
                   ))}
-                  {!filteredTeams.length && (
-                    <tr>
-                      <td colSpan={5} className="py-10 text-center text-slate-400 font-bold">
-                        No teams match your filter/search.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
+        {/* 4. DEEP DIVE */}
+        {activeTab === "deep-dive" && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
+            <div className="lg:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-fit">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Select Focus</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block">By Coach</label>
+                  <select 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
+                    onChange={(e) => setSelectedEntity({ type: 'coach', id: e.target.value })}
+                    value={selectedEntity.type === 'coach' ? selectedEntity.id : ''}
+                  >
+                    <option value="">Select...</option>
+                    {uniqueCoaches.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="relative text-center"><span className="bg-white px-2 text-[10px] text-slate-300 font-black">OR</span></div>
+                <div>
+                  <label className="text-[10px] font-black text-indigo-600 uppercase mb-1 block">By Team</label>
+                  <select 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none"
+                    onChange={(e) => setSelectedEntity({ type: 'team', id: e.target.value })}
+                    value={selectedEntity.type === 'team' ? selectedEntity.id : ''}
+                  >
+                    <option value="">Select...</option>
+                    {uniqueTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-3">
+              {deepDiveStats ? (
+                <div className="space-y-6">
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex items-center gap-6">
+                      <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white"><Briefcase size={32} /></div>
+                      <div>
+                        <h2 className="text-3xl font-black text-slate-900">{deepDiveStats.name}</h2>
+                        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-2">{selectedEntity.type.toUpperCase()} PROFILE</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="text-center px-6 border-r border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Lost</p>
+                        <p className="text-2xl font-black text-rose-500">{deepDiveStats.totalLost}</p>
+                      </div>
+                      <div className="text-center px-6">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Est. Revenue Impact</p>
+                        <p className="text-2xl font-black text-rose-500">-${deepDiveStats.lostRevenue.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Lista de equipos del coach */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {deepDiveStats.teams.map((t, idx) => (
+                      <div key={idx} className="p-6 bg-white rounded-3xl border border-slate-200">
+                        <div className="flex justify-between mb-4">
+                          <p className="font-black text-slate-900">{t.name}</p>
+                          <span className={(t.retained/t.lastYear) >= 0.8 ? 'text-emerald-600 font-black' : 'text-blue-600 font-black'}>
+                            {t.lastYear > 0 ? Math.round((t.retained/t.lastYear)*100) : 0}%
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                           <button onClick={() => handleOpenPlayerList(t.name, 'Retained')} className="text-[10px] bg-blue-50 text-blue-600 px-3 py-1 rounded-lg font-bold">View Retained</button>
+                           <button onClick={() => handleOpenPlayerList(t.name, 'Lost')} className="text-[10px] bg-rose-50 text-rose-600 px-3 py-1 rounded-lg font-bold">View Lost</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full min-h-[300px] flex items-center justify-center bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] text-slate-400 font-bold">
+                  Select a Coach or Team to analyze.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <footer className="mt-16 py-10 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] gap-6">
-          <p>Wayne Reporting Framework // Google Sheet connected</p>
+          <p>Wayne Reporting Framework // Connected to Google Sheets</p>
           <div className="flex items-center gap-6">
-            <span className="flex items-center gap-2 text-emerald-500">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Live Data
-            </span>
+            <span className="flex items-center gap-2 text-emerald-500 font-bold uppercase tracking-widest"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Live Data</span>
           </div>
         </footer>
       </div>
