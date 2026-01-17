@@ -334,11 +334,15 @@ export default function WayneDashboard({ onLogout }) {
 
         const [kpiText, progText, ageText, teamText, playerText] = responses;
 
-        // 1. KPIs
+        // 1. KPIs - STRICT FILTERING ADDED
         const kpiRows = rowsToObjects(parseCSV(kpiText));
         const kpiMap = {};
         kpiRows.forEach(r => {
-          const key = (pick(r, ["Segment", "segment"]) || "club").toLowerCase();
+          const rawSegment = pick(r, ["Segment", "segment"]);
+          // IMPORTANT: Skip empty rows or Notes rows to avoid overwriting data with zeros
+          if (!rawSegment || rawSegment.includes("NOTE") || rawSegment.includes("Notes") || rawSegment.trim() === "") return;
+          
+          const key = rawSegment.toLowerCase();
           kpiMap[key] = {
             totalLast: toNumber(pick(r, ["Total 24/25", "totalLastYear"])),
             totalThis: toNumber(pick(r, ["Total 25/26", "totalThisYear"])),
@@ -352,25 +356,32 @@ export default function WayneDashboard({ onLogout }) {
         });
         setKpisGender(kpiMap);
 
-        // 2. Programs
+        // 2. Programs - STRICT FILTERING ADDED
         const progRows = rowsToObjects(parseCSV(progText));
-        setPrograms(progRows.map(r => {
-          const retained = toNumber(pick(r, ["retained", "Retained"]));
-          const lost = toNumber(pick(r, ["lost", "Lost"]));
-          const total = retained + lost;
-          return {
-            name: pick(r, ["name", "Name"]),
-            retained,
-            lost,
-            retentionRate: total > 0 ? Math.round((retained / total) * 100) : 0,
-            lastYear: toNumber(pick(r, ["lastYear", "Last Year"])) || total,
-            thisYear: toNumber(pick(r, ["thisYear", "This Year"])) || retained
-          };
+        setPrograms(progRows
+          .filter(r => {
+             const name = pick(r, ["name", "Name"]);
+             return name && name.trim() !== ""; // Filter out empty lines
+          })
+          .map(r => {
+            const retained = toNumber(pick(r, ["retained", "Retained"]));
+            const lost = toNumber(pick(r, ["lost", "Lost"]));
+            const total = retained + lost;
+            return {
+              name: pick(r, ["name", "Name"]),
+              retained,
+              lost,
+              retentionRate: total > 0 ? Math.round((retained / total) * 100) : 0,
+              lastYear: toNumber(pick(r, ["lastYear", "Last Year"])) || total,
+              thisYear: toNumber(pick(r, ["thisYear", "This Year"])) || retained
+            };
         }));
 
-        // 3. Age Diagnostic (FIXED)
+        // 3. Age Diagnostic
         const ageRows = rowsToObjects(parseCSV(ageText));
-        setAgeDiag(ageRows.map(r => {
+        setAgeDiag(ageRows
+          .filter(r => pick(r, ["year", "Year"])) // Filter empty rows
+          .map(r => {
             const rate = normalizePercent(pick(r, ["rate", "Rate"]));
             let eligibleRate = normalizePercent(pick(r, ["eligibleRate", "EligibleRate"]));
             if (eligibleRate === 0 && rate > 0) eligibleRate = rate;
@@ -387,59 +398,67 @@ export default function WayneDashboard({ onLogout }) {
 
         // 4. Teams
         const teamRows = rowsToObjects(parseCSV(teamText));
-        setTeams(teamRows.map(r => {
-          const name = pick(r, ["name", "Team", "Team (Last Yr)"]) || "";
-          return {
-            name,
-            program: pick(r, ["program", "Program"]),
-            coach: pick(r, ["coach", "Coach"]) || "Unassigned",
-            lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])),
-            retained: toNumber(pick(r, ["retained", "Retained"])),
-            lost: toNumber(pick(r, ["lost", "Lost"])),
-            gender: pick(r, ["gender", "Gender"]) || (name.toLowerCase().includes("girl") ? "girls" : "boys"),
-            fee: toNumber(pick(r, ["Fee", "fee"])) || 3000
-          };
+        setTeams(teamRows
+          .filter(r => pick(r, ["name", "Team", "Team (Last Yr)"])) // Filter empty rows
+          .map(r => {
+            const name = pick(r, ["name", "Team", "Team (Last Yr)"]) || "";
+            return {
+              name,
+              program: pick(r, ["program", "Program"]),
+              coach: pick(r, ["coach", "Coach"]) || "Unassigned",
+              lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])),
+              retained: toNumber(pick(r, ["retained", "Retained"])),
+              lost: toNumber(pick(r, ["lost", "Lost"])),
+              gender: pick(r, ["gender", "Gender"]) || (name.toLowerCase().includes("girl") ? "girls" : "boys"),
+              fee: toNumber(pick(r, ["Fee", "fee"])) || 3000
+            };
         }));
 
         // 5. Players
         const playerRows = rowsToObjects(parseCSV(playerText));
-        setPlayerList(playerRows.map(r => {
-          const regLast = pick(r, ["Registered Last Yr (Y/N)", "Registered Last Yr", "in_24_25"]);
-          const regThis = pick(r, ["Registered This Yr (Y/N)", "Registered This Yr", "in_25_26"]);
-          const teamLast = pick(r, ["Team (Last Yr)", "team_last"]);
-          const ageGroupLast = pick(r, ["Age Group (Last Yr)", "age_group_last"]);
-          
-          let status = "Unknown";
-          if (regLast === 'Y' && regThis === 'Y') status = "Retained";
-          else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
-          else if (regLast !== 'Y' && regThis === 'Y') status = "New";
+        setPlayerList(playerRows
+          .filter(r => {
+             // Filter rows that don't have a name or ID
+             const hasName = pick(r, ["first_name", "First Name", "last_name", "Last Name"]);
+             return hasName && hasName.trim() !== "";
+          })
+          .map(r => {
+            const regLast = pick(r, ["Registered Last Yr (Y/N)", "Registered Last Yr", "in_24_25"]);
+            const regThis = pick(r, ["Registered This Yr (Y/N)", "Registered This Yr", "in_25_26"]);
+            const teamLast = pick(r, ["Team (Last Yr)", "team_last"]);
+            const ageGroupLast = pick(r, ["Age Group (Last Yr)", "age_group_last"]);
+            
+            let status = "Unknown";
+            if (regLast === 'Y' && regThis === 'Y') status = "Retained";
+            else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
+            else if (regLast !== 'Y' && regThis === 'Y') status = "New";
 
-          const isAgedOutRow = pick(r, ["aged_out", "Aged Out"]);
-          const isAgedOut = isAgedOutRow 
-            ? (isAgedOutRow.toUpperCase() === 'Y' || isAgedOutRow.toUpperCase() === 'YES')
-            : (
-                teamLast?.includes('06/07') || 
-                teamLast?.includes('2006') || 
-                ageGroupLast?.includes('U19') ||
-                ageGroupLast?.includes('2006')
-              );
+            const isAgedOutRow = pick(r, ["aged_out", "Aged Out"]);
+            const isAgedOut = isAgedOutRow 
+              ? (isAgedOutRow.toUpperCase() === 'Y' || isAgedOutRow.toUpperCase() === 'YES')
+              : (
+                  teamLast?.includes('06/07') || 
+                  teamLast?.includes('2006') || 
+                  ageGroupLast?.includes('U19') ||
+                  ageGroupLast?.includes('2006')
+                );
 
-          let gender = pick(r, ["gender", "Gender"]) || "";
-          if (!gender) {
-             const team = teamLast || pick(r, ["Team (This Yr)", "team_this"]) || "";
-             gender = team.toLowerCase().includes('girl') ? "Girls" : "Boys";
-          }
-          if (gender.toUpperCase() === 'M' || gender.toLowerCase() === 'male') gender = "Boys";
-          if (gender.toUpperCase() === 'F' || gender.toLowerCase() === 'female') gender = "Girls";
+            let gender = pick(r, ["gender", "Gender"]) || "";
+            if (!gender) {
+              const team = teamLast || pick(r, ["Team (This Yr)", "team_this"]) || "";
+              gender = team.toLowerCase().includes('girl') ? "Girls" : "Boys";
+            }
+            if (gender.toUpperCase() === 'M' || gender.toLowerCase() === 'male') gender = "Boys";
+            if (gender.toUpperCase() === 'F' || gender.toLowerCase() === 'female') gender = "Girls";
 
-          return {
-            name: `${pick(r, ["first_name", "First Name"])} ${pick(r, ["last_name", "Last Name"])}`.trim(),
-            status,
-            teamLast,
-            teamThis: pick(r, ["Team (This Yr)", "team_this"]),
-            gender,
-            agedOut: isAgedOut
-          };
+            return {
+              name: `${pick(r, ["first_name", "First Name"])} ${pick(r, ["last_name", "Last Name"])}`.trim(),
+              status,
+              teamLast,
+              teamThis: pick(r, ["Team (This Yr)", "team_this"]),
+              gender,
+              agedOut: isAgedOut
+            };
         }));
 
       } catch (e) {
@@ -716,4 +735,523 @@ export default function WayneDashboard({ onLogout }) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
-              <Scorecard label="2025–26 Players
+              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" />
+              <Scorecard 
+                label="Net Change" 
+                value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} 
+                sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`} 
+                highlight 
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <KPIBox 
+                title="Retained" 
+                value={activeData.retained.toLocaleString()} 
+                sub="Stayed from last season"
+                percent={`${retentionPercent}%`} 
+                icon={UserCheck} 
+                color="bg-blue-600" 
+                trend="up"
+                clickable 
+                onClick={() => handleOpenPlayerList({ status: 'Retained' }, 'Retained Players')}
+              />
+              <KPIBox 
+                title="Lost (Churn)" 
+                value={lostExcludingAgedOut.toLocaleString()} 
+                sub="Did not return (excl. aged out)"
+                percent={`${churnPercent}%`} 
+                icon={UserMinus} 
+                color="bg-rose-500" 
+                trend="down"
+                tooltip="Excludes players who naturally graduated (U19)"
+                clickable 
+                onClick={() => handleOpenPlayerList({ status: 'Lost' }, 'Lost Players (excl. aged out)')}
+              />
+              <KPIBox 
+                title="New Players" 
+                value={activeData.new.toLocaleString()} 
+                sub="First time this season"
+                icon={UserPlus} 
+                color="bg-emerald-600" 
+                trend="up"
+                clickable 
+                onClick={() => handleOpenPlayerList({ status: 'New' }, 'New Players')}
+              />
+              <KPIBox 
+                title="Eligible Retention" 
+                value={`${eligibleRetentionPercent}%`} 
+                sub={`Retained ÷ (${activeData.totalLast} - ${agedOut} aged out)`}
+                icon={Target} 
+                color="bg-indigo-600"
+                tooltip="Retention rate excluding players who aged out"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+              {/* Retention by Program */}
+              <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50 lg:col-span-2">
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <ClipboardList size={18} className="text-blue-400" />
+                  Retention by Program
+                </h4>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={programs} margin={{ left: 0, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                      <Bar yAxisId="left" dataKey="retained" name="Retained" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="lost" name="Lost" fill="#475569" radius={[4, 4, 0, 0]} />
+                      <Line yAxisId="right" type="monotone" dataKey="retentionRate" name="Retention %" stroke="#10b981" strokeWidth={3} dot={{ r: 5, fill: "#10b981" }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Gender Split - Pie + Dynamic Data */}
+              <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <Users size={18} className="text-pink-400" />
+                  Gender Split
+                </h4>
+                <div className="h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={genderPieData}
+                        cx="50%" cy="50%"
+                        innerRadius={45} outerRadius={70}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {genderPieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Dynamic Text from Excel */}
+                <div className="mt-4 space-y-3">
+                  {genderComparisonData.map((g, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-sm border-t border-slate-800 pt-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${g.name === 'Boys' ? 'bg-blue-500' : 'bg-pink-500'}`}></div>
+                        <span className="text-slate-300 font-bold">{g.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono">
+                        <span className="text-slate-500">{g.lastYear}</span>
+                        <ChevronRight size={14} className="text-slate-600" />
+                        <span className="text-white font-bold">{g.thisYear}</span>
+                        <span className={`ml-1 text-xs px-1.5 py-0.5 rounded ${g.change >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                          {g.change >= 0 ? '+' : ''}{g.change}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Alert Banner */}
+            <div className="bg-gradient-to-r from-rose-500/20 to-rose-600/10 border border-rose-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <AlertTriangle className="text-rose-400" size={24} />
+                <div>
+                  <p className="text-white font-bold">Churn Alert: {churnPercent}% of players did not return</p>
+                  <p className="text-sm text-slate-400">Estimated revenue impact: ${displayRevenueLost.toLocaleString()}</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveTab('financials')} className="px-5 py-2.5 bg-rose-500 hover:bg-rose-400 rounded-xl font-bold text-sm text-white transition-all">
+                View Financial Impact →
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ==================== DIAGNOSIS TAB ==================== */}
+        {activeTab === "diagnosis" && (
+          <div className="space-y-6">
+            <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
+              <h4 className="text-xl font-bold text-white mb-2">Retention by Age Group</h4>
+              <p className="text-slate-400 text-sm mb-6">Compare player counts year over year by birth year</p>
+              <div className="h-[380px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={ageComparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                    <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                    <Area yAxisId="right" type="monotone" dataKey="eligibleRate" name="Eligible %" fill="#3b82f6" fillOpacity={0.1} stroke="transparent" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {ageComparisonData.slice(0, 6).map((a, idx) => (
+                <div key={idx} className="bg-[#111827] rounded-xl p-4 text-center border border-slate-700/50">
+                  <p className="text-white font-bold text-lg">{a.year}</p>
+                  <p className="text-slate-400 text-sm">{a.playersLast} → {a.playersThis}</p>
+                  <p className={`text-lg font-bold ${a.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {a.change >= 0 ? '+' : ''}{a.change}%
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== FINANCIALS TAB ==================== */}
+        {activeTab === "financials" && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-8 rounded-2xl shadow-lg shadow-rose-500/20">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="flex items-center gap-5">
+                  <div className="bg-white/20 p-4 rounded-2xl">
+                    <DollarSign size={36} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-rose-200 text-xs font-bold uppercase tracking-wider mb-1">Revenue Lost to Churn</p>
+                    <h3 className="text-5xl font-black text-white">${displayRevenueLost.toLocaleString()}</h3>
+                    <p className="text-rose-200 text-sm mt-1">{lostExcludingAgedOut} players × ${activeData.fee.toLocaleString()} avg fee</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-rose-500/20 rounded-xl">
+                    <UserMinus className="text-rose-400" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Lost Revenue</p>
+                    <p className="text-2xl font-black text-rose-400">-${displayRevenueLost.toLocaleString()}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-500">From {lostExcludingAgedOut} players who didn't return</p>
+              </div>
+
+              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-emerald-500/20 rounded-xl">
+                    <UserPlus className="text-emerald-400" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">New Revenue</p>
+                    <p className="text-2xl font-black text-emerald-400">+${(activeData.new * activeData.fee).toLocaleString()}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-500">From {activeData.new} new players</p>
+              </div>
+
+              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-blue-500/20 rounded-xl">
+                    <Target className="text-blue-400" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Net Impact</p>
+                    <p className={`text-2xl font-black ${activeData.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {activeData.net >= 0 ? '+' : ''}${(activeData.net * activeData.fee).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-500">Net change of {activeData.net} players</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-lg shadow-emerald-500/20">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-5">
+                <div>
+                  <p className="text-emerald-200 text-xs font-bold uppercase tracking-wider mb-1">Recovery Opportunity</p>
+                  <h3 className="text-4xl font-black text-white">${potentialRecovery.toLocaleString()}</h3>
+                  <p className="text-emerald-200 text-sm mt-1">Estimated if 30% of churned players return</p>
+                </div>
+                <div className="bg-white/10 px-5 py-4 rounded-xl border border-white/20">
+                  <p className="text-xs font-bold text-emerald-200 uppercase mb-2">Action Items</p>
+                  <ul className="text-sm text-white space-y-1">
+                    <li>• Contact {Math.round(lostExcludingAgedOut * 0.3)} high-value players</li>
+                    <li>• Offer early-bird discount</li>
+                    <li>• Survey for churn reasons</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-bold text-white">Top Revenue Losses by Team</h4>
+                <button 
+                  onClick={() => exportToCSV(filteredTeams.map(t => ({
+                    Team: t.name,
+                    Program: t.program,
+                    Lost: t.lost,
+                    Fee: t.fee,
+                    'Revenue Lost': t.lost * t.fee
+                  })), 'Revenue_Losses')}
+                  className="text-xs text-blue-400 flex items-center gap-1 hover:text-blue-300"
+                >
+                  <Download size={14} /> Export
+                </button>
+              </div>
+              <div className="space-y-3">
+                {filteredTeams
+                  .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
+                  .slice(0, 5)
+                  .map((team, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                      <div>
+                        <p className="font-bold text-white">{team.name}</p>
+                        <p className="text-xs text-slate-500">{team.lost} players × ${team.fee}</p>
+                      </div>
+                      <p className="text-lg font-black text-rose-400">-${(team.lost * team.fee).toLocaleString()}</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TEAMS TAB ==================== */}
+        {activeTab === "full-roster" && (
+          <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div>
+                <h4 className="text-xl font-bold text-white">Team Roster</h4>
+                <p className="text-slate-400 text-sm">Click on numbers to see player lists</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search team or coach..."
+                    className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl py-2.5 pl-10 pr-4 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <button 
+                  onClick={() => exportToCSV(filteredTeams, 'Teams_Export')}
+                  className="p-2.5 bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
+                >
+                  <Download size={18} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-700/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                    <th className="pb-3 pr-4">Team</th>
+                    <th className="pb-3 pr-4">Coach</th>
+                    <th className="pb-3 text-center">Last Yr</th>
+                    <th className="pb-3 text-center">Retained</th>
+                    <th className="pb-3 text-center">Lost</th>
+                    <th className="pb-3 text-center">Rate</th>
+                    <th className="pb-3 text-right">Revenue Lost</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/30">
+                  {filteredTeams.map((team, idx) => {
+                    const retRate = team.lastYear > 0 ? Math.round((team.retained / team.lastYear) * 100) : 0;
+                    return (
+                      <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="py-4 pr-4">
+                          <div className="font-bold text-white">{team.name}</div>
+                          <div className="text-xs text-blue-400">{team.program}</div>
+                        </td>
+                        <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
+                        <td className="py-4 text-center text-slate-400">{team.lastYear}</td>
+                        <td className="py-4 text-center">
+                          <button 
+                            onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)}
+                            className="text-blue-400 font-bold hover:underline"
+                          >
+                            {team.retained}
+                          </button>
+                        </td>
+                        <td className="py-4 text-center">
+                          <button 
+                            onClick={() => handleOpenPlayerList({ team: team.name, status: 'Lost' }, `Lost: ${team.name}`)}
+                            className="text-rose-400 font-bold hover:underline"
+                          >
+                            {team.lost}
+                          </button>
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                            retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' :
+                            retRate >= 50 ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-rose-500/20 text-rose-400'
+                          }`}>
+                            {retRate}%
+                          </span>
+                        </td>
+                        <td className="py-4 text-right font-bold text-rose-400">
+                          -${(team.lost * team.fee).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== DEEP DIVE TAB ==================== */}
+        {activeTab === "deep-dive" && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <div className="lg:col-span-1 bg-[#111827] p-5 rounded-2xl border border-slate-700/50 h-fit">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Select Focus</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-blue-400 uppercase mb-2 block">By Coach</label>
+                  <select 
+                    className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl p-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    onChange={(e) => setSelectedEntity({ type: 'coach', id: e.target.value })}
+                    value={selectedEntity.type === 'coach' ? selectedEntity.id : ''}
+                  >
+                    <option value="">Select coach...</option>
+                    {uniqueCoaches.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="text-center text-slate-600 text-xs font-bold">OR</div>
+                <div>
+                  <label className="text-xs font-bold text-indigo-400 uppercase mb-2 block">By Team</label>
+                  <select 
+                    className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl p-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    onChange={(e) => setSelectedEntity({ type: 'team', id: e.target.value })}
+                    value={selectedEntity.type === 'team' ? selectedEntity.id : ''}
+                  >
+                    <option value="">Select team...</option>
+                    {uniqueTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-3">
+              {deepDiveStats ? (
+                <div className="space-y-4">
+                  <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${selectedEntity.type === 'coach' ? 'bg-blue-500/20' : 'bg-indigo-500/20'}`}>
+                          {selectedEntity.type === 'coach' ? <Briefcase size={24} className="text-blue-400" /> : <Users size={24} className="text-indigo-400" />}
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold text-white">{deepDiveStats.name}</h2>
+                          <p className="text-slate-500 text-xs font-bold uppercase">{selectedEntity.type} Profile</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-6">
+                        <div className="text-center">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-1">Retention</p>
+                          <p className={`text-2xl font-black ${deepDiveStats.retentionRate >= 70 ? 'text-emerald-400' : deepDiveStats.retentionRate >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                            {deepDiveStats.retentionRate}%
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-1">Lost</p>
+                          <p className="text-2xl font-black text-rose-400">{deepDiveStats.totalLost}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-1">Impact</p>
+                          <p className="text-2xl font-black text-rose-400">-${deepDiveStats.lostRevenue.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {deepDiveStats.teams.map((t, idx) => {
+                      const teamRetRate = t.lastYear > 0 ? Math.round((t.retained / t.lastYear) * 100) : 0;
+                      return (
+                        <div key={idx} className="p-5 bg-[#111827] rounded-2xl border border-slate-700/50">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <p className="font-bold text-white">{t.name}</p>
+                              <p className="text-xs text-slate-500">{t.program}</p>
+                            </div>
+                            <span className={`px-2.5 py-1 rounded-lg text-sm font-bold ${
+                              teamRetRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' :
+                              teamRetRate >= 50 ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {teamRetRate}%
+                            </span>
+                          </div>
+                          <div className="flex gap-3 mb-4">
+                            <div className="flex-1 bg-slate-800/50 rounded-lg p-2.5 text-center">
+                              <p className="text-xs text-slate-500">Last Yr</p>
+                              <p className="font-bold text-white">{t.lastYear}</p>
+                            </div>
+                            <div className="flex-1 bg-blue-500/10 rounded-lg p-2.5 text-center">
+                              <p className="text-xs text-blue-400">Retained</p>
+                              <p className="font-bold text-blue-400">{t.retained}</p>
+                            </div>
+                            <div className="flex-1 bg-rose-500/10 rounded-lg p-2.5 text-center">
+                              <p className="text-xs text-rose-400">Lost</p>
+                              <p className="font-bold text-rose-400">{t.lost}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleOpenPlayerList({ team: t.name, status: 'Retained' }, `Retained: ${t.name}`)}
+                              className="flex-1 text-xs bg-blue-500/20 text-blue-400 px-3 py-2 rounded-lg font-bold hover:bg-blue-500/30 transition-colors"
+                            >
+                              View Retained
+                            </button>
+                            <button 
+                              onClick={() => handleOpenPlayerList({ team: t.name, status: 'Lost' }, `Lost: ${t.name}`)}
+                              className="flex-1 text-xs bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg font-bold hover:bg-rose-500/30 transition-colors"
+                            >
+                              View Lost
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full min-h-[350px] flex items-center justify-center bg-[#111827] border border-slate-700/50 rounded-2xl">
+                  <div className="text-center text-slate-500">
+                    <Search size={36} className="mx-auto mb-3 text-slate-600" />
+                    <p>Select a Coach or Team to analyze</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* FOOTER */}
+        <footer className="mt-10 py-6 border-t border-slate-700/50 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
+          <p>RetainPlayers • Player Retention Intelligence</p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+            <span>Live Data</span>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
