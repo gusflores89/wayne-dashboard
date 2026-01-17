@@ -4,8 +4,8 @@ import {
   ComposedChart, Line, Area, Legend, PieChart, Pie, Cell,
 } from "recharts";
 import {
-  UserMinus, RefreshCcw, TrendingUp, Award, Search, ShieldCheck,
-  GraduationCap, ClipboardList, Briefcase, ChevronRight, DollarSign, X, Users, Target,
+  UserMinus, TrendingUp, Award, Search, ShieldCheck,
+  ClipboardList, Briefcase, ChevronRight, DollarSign, X, Users, Target,
   AlertTriangle, TrendingDown, UserPlus, UserCheck, LogOut, Download, Info
 } from "lucide-react";
 
@@ -273,23 +273,12 @@ const CustomTooltip = ({ active, payload, label }) => {
     return (
       <div className="bg-[#1e293b] border border-slate-600/50 rounded-xl p-3 shadow-xl">
         <p className="text-white font-bold text-sm mb-1">{label}</p>
-        {payload.map((item, idx) => {
-           // Si el nombre es "Diff", estilizamos diferente
-           if (item.name.startsWith("Diff")) return null; 
-
-           return (
-            <p key={idx} className="text-sm" style={{ color: item.color }}>
-              {item.name}: {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
-              {item.name?.toLowerCase().includes('%') || item.name?.toLowerCase().includes('rate') ? '%' : ''}
-            </p>
-           );
-        })}
-        {/* Render diff separately if exists */}
-        {payload[0].payload.diff !== undefined && (
-             <div className={`mt-2 text-xs font-bold px-2 py-1 rounded ${payload[0].payload.diff >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                Diff: {payload[0].payload.diff > 0 ? '+' : ''}{payload[0].payload.diff}
-             </div>
-        )}
+        {payload.map((item, idx) => (
+          <p key={idx} className="text-sm" style={{ color: item.color }}>
+            {item.name}: {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
+            {item.name?.toLowerCase().includes('%') || item.name?.toLowerCase().includes('rate') ? '%' : ''}
+          </p>
+        ))}
       </div>
     );
   }
@@ -322,7 +311,6 @@ export default function WayneDashboard({ onLogout }) {
       try {
         if (!URLS.KPIS_GENDER) {
           console.log("No ENV variables found. Using Demo Data.");
-          // ... (Demo Data kept simple for brevity, logic remains same)
           setKpisGender({
             club: { totalLast: 601, totalThis: 545, net: -56, retained: 338, lost: 263, new: 207, fee: 3000, agedOut: 46 },
             boys: { totalLast: 400, totalThis: 365, net: -35, retained: 230, lost: 170, new: 135, fee: 3000, agedOut: 30 },
@@ -380,13 +368,12 @@ export default function WayneDashboard({ onLogout }) {
           };
         }));
 
-        // 3. Age Diagnostic (UPDATED LOGIC)
+        // 3. Age Diagnostic (FIXED)
         const ageRows = rowsToObjects(parseCSV(ageText));
         setAgeDiag(ageRows.map(r => {
             const rate = normalizePercent(pick(r, ["rate", "Rate"]));
-            // Fallback for eligibleRate if column missing
             let eligibleRate = normalizePercent(pick(r, ["eligibleRate", "EligibleRate"]));
-            if (eligibleRate === 0 && rate > 0) eligibleRate = rate; // Prevent flat line if data missing
+            if (eligibleRate === 0 && rate > 0) eligibleRate = rate;
 
             return {
                 year: pick(r, ["year", "Year"]),
@@ -427,7 +414,6 @@ export default function WayneDashboard({ onLogout }) {
           else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
           else if (regLast !== 'Y' && regThis === 'Y') status = "New";
 
-          // Robust Aged Out check
           const isAgedOutRow = pick(r, ["aged_out", "Aged Out"]);
           const isAgedOut = isAgedOutRow 
             ? (isAgedOutRow.toUpperCase() === 'Y' || isAgedOutRow.toUpperCase() === 'YES')
@@ -466,7 +452,6 @@ export default function WayneDashboard({ onLogout }) {
     loadData();
   }, []);
 
-  // Active data
   const activeData = kpisGender?.[genderFilter] ?? {
     totalLast: 0, totalThis: 0, net: 0, retained: 0, lost: 0, new: 0, fee: 3000, agedOut: 0
   };
@@ -487,7 +472,6 @@ export default function WayneDashboard({ onLogout }) {
   const changePercent = activeData.totalLast > 0
     ? Math.round(((activeData.totalThis - activeData.totalLast) / activeData.totalLast) * 100) : 0;
 
-  // Revenue
   const exactRevenueLost = useMemo(() => {
     if (teams.length === 0) return 0;
     const relevantTeams = teams.filter(t => {
@@ -500,7 +484,6 @@ export default function WayneDashboard({ onLogout }) {
   const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (lostExcludingAgedOut * activeData.fee);
   const potentialRecovery = Math.round(displayRevenueLost * 0.3);
 
-  // Filter teams
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return teams.filter((t) => {
@@ -510,7 +493,7 @@ export default function WayneDashboard({ onLogout }) {
     });
   }, [teams, searchTerm, genderFilter]);
 
-  // Gender comparison data
+  // Gender Comparison Data (for Text below Pie)
   const genderComparisonData = useMemo(() => {
     if (!kpisGender) return [];
     return [
@@ -518,18 +501,28 @@ export default function WayneDashboard({ onLogout }) {
         name: "Boys", 
         lastYear: kpisGender.boys?.totalLast || 0, 
         thisYear: kpisGender.boys?.totalThis || 0,
-        diff: (kpisGender.boys?.totalThis || 0) - (kpisGender.boys?.totalLast || 0)
+        change: kpisGender.boys && kpisGender.boys.totalLast > 0 
+          ? Math.round(((kpisGender.boys.totalThis - kpisGender.boys.totalLast) / kpisGender.boys.totalLast) * 100) : 0
       },
       { 
         name: "Girls", 
         lastYear: kpisGender.girls?.totalLast || 0, 
         thisYear: kpisGender.girls?.totalThis || 0,
-        diff: (kpisGender.girls?.totalThis || 0) - (kpisGender.girls?.totalLast || 0)
+        change: kpisGender.girls && kpisGender.girls.totalLast > 0 
+          ? Math.round(((kpisGender.girls.totalThis - kpisGender.girls.totalLast) / kpisGender.girls.totalLast) * 100) : 0
       }
     ];
   }, [kpisGender]);
 
-  // Age comparison data
+  // Gender Pie Data (for Chart)
+  const genderPieData = useMemo(() => {
+    if (!kpisGender) return [];
+    return [
+      { name: "Boys", value: kpisGender.boys?.totalThis || 0, color: "#3b82f6" },
+      { name: "Girls", value: kpisGender.girls?.totalThis || 0, color: "#ec4899" }
+    ];
+  }, [kpisGender]);
+
   const ageComparisonData = useMemo(() => {
     return ageDiag.map(a => ({
       ...a,
@@ -537,7 +530,6 @@ export default function WayneDashboard({ onLogout }) {
     }));
   }, [ageDiag]);
 
-  // Deep Dive
   const deepDiveStats = useMemo(() => {
     if (!selectedEntity.id) return null;
     
@@ -566,7 +558,6 @@ export default function WayneDashboard({ onLogout }) {
   const uniqueCoaches = useMemo(() => [...new Set(teams.map(t => t.coach).filter(c => c && c !== "Unassigned"))].sort(), [teams]);
   const uniqueTeams = useMemo(() => [...new Set(teams.map(t => t.name))].sort(), [teams]);
 
-  // Open player modal
   const handleOpenPlayerList = (filter, title) => {
     let matchedPlayers = [];
     
@@ -725,189 +716,4 @@ export default function WayneDashboard({ onLogout }) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
-              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" />
-              <Scorecard 
-                label="Net Change" 
-                value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} 
-                sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`} 
-                highlight 
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <KPIBox 
-                title="Retained" 
-                value={activeData.retained.toLocaleString()} 
-                sub="Stayed from last season"
-                percent={`${retentionPercent}%`} 
-                icon={UserCheck} 
-                color="bg-blue-600" 
-                trend="up"
-                clickable 
-                onClick={() => handleOpenPlayerList({ status: 'Retained' }, 'Retained Players')}
-              />
-              <KPIBox 
-                title="Lost (Churn)" 
-                value={lostExcludingAgedOut.toLocaleString()} 
-                sub="Did not return (excl. aged out)"
-                percent={`${churnPercent}%`} 
-                icon={UserMinus} 
-                color="bg-rose-500" 
-                trend="down"
-                tooltip="Excludes players who naturally graduated (U19)"
-                clickable 
-                onClick={() => handleOpenPlayerList({ status: 'Lost' }, 'Lost Players (excl. aged out)')}
-              />
-              <KPIBox 
-                title="New Players" 
-                value={activeData.new.toLocaleString()} 
-                sub="First time this season"
-                icon={UserPlus} 
-                color="bg-emerald-600" 
-                trend="up"
-                clickable 
-                onClick={() => handleOpenPlayerList({ status: 'New' }, 'New Players')}
-              />
-              <KPIBox 
-                title="Eligible Retention" 
-                value={`${eligibleRetentionPercent}%`} 
-                sub={`Retained ÷ (${activeData.totalLast} - ${agedOut} aged out)`}
-                icon={Target} 
-                color="bg-indigo-600"
-                tooltip="Retention rate excluding players who aged out"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-              {/* Retention by Program */}
-              <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50 lg:col-span-2">
-                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <ClipboardList size={18} className="text-blue-400" />
-                  Retention by Program
-                </h4>
-                <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={programs} margin={{ left: 0, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                      <Bar yAxisId="left" dataKey="retained" name="Retained" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar yAxisId="left" dataKey="lost" name="Lost" fill="#475569" radius={[4, 4, 0, 0]} />
-                      <Line yAxisId="right" type="monotone" dataKey="retentionRate" name="Retention %" stroke="#10b981" strokeWidth={3} dot={{ r: 5, fill: "#10b981" }} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Gender Split - BAR CHART UPDATE */}
-              <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
-                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <Users size={18} className="text-pink-400" />
-                  Gender Comparison
-                </h4>
-                <div className="h-[220px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
-                      data={genderComparisonData} 
-                      layout="vertical" 
-                      margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
-                      barSize={20}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                      <XAxis type="number" hide />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: '#fff', fontSize: 14, fontWeight: 'bold' }} 
-                        width={50}
-                      />
-                      <Tooltip 
-                        cursor={{fill: 'transparent'}}
-                        content={<CustomTooltip />}
-                      />
-                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                      <Bar dataKey="lastYear" name="24/25 Season" fill="#475569" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="thisYear" name="25/26 Season" radius={[0, 4, 4, 0]}>
-                        {genderComparisonData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.name === 'Girls' ? '#ec4899' : '#3b82f6'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* Alert Banner */}
-            <div className="bg-gradient-to-r from-rose-500/20 to-rose-600/10 border border-rose-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <AlertTriangle className="text-rose-400" size={24} />
-                <div>
-                  <p className="text-white font-bold">Churn Alert: {churnPercent}% of players did not return</p>
-                  <p className="text-sm text-slate-400">Estimated revenue impact: ${displayRevenueLost.toLocaleString()}</p>
-                </div>
-              </div>
-              <button onClick={() => setActiveTab('financials')} className="px-5 py-2.5 bg-rose-500 hover:bg-rose-400 rounded-xl font-bold text-sm text-white transition-all">
-                View Financial Impact →
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ==================== DIAGNOSIS TAB ==================== */}
-        {activeTab === "diagnosis" && (
-          <div className="space-y-6">
-            <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
-              <h4 className="text-xl font-bold text-white mb-2">Retention by Age Group</h4>
-              <p className="text-slate-400 text-sm mb-6">Compare player counts year over year by birth year</p>
-              <div className="h-[380px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={ageComparisonData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                    <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
-                    <Area yAxisId="right" type="monotone" dataKey="eligibleRate" name="Eligible %" fill="#3b82f6" fillOpacity={0.1} stroke="transparent" />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {ageComparisonData.slice(0, 6).map((a, idx) => (
-                <div key={idx} className="bg-[#111827] rounded-xl p-4 text-center border border-slate-700/50">
-                  <p className="text-white font-bold text-lg">{a.year}</p>
-                  <p className="text-slate-400 text-sm">{a.playersLast} → {a.playersThis}</p>
-                  <p className={`text-lg font-bold ${a.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {a.change >= 0 ? '+' : ''}{a.change}%
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ==================== FINANCIALS TAB ==================== */}
-        {activeTab === "financials" && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-8 rounded-2xl shadow-lg shadow-rose-500/20">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="flex items-center gap-5">
-                  <div className="bg-white/20 p-4 rounded-2xl">
-                    <DollarSign size={36} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="text-rose-200 text-xs font-bold uppercase tracking-wider mb-1">Revenue Lost to Churn</p>
-                    <h3 className="text-5xl font-black text-white">${displayRevenueLost.toLocaleString()}</h3>
-                    <p className="text-rose-200 text-sm mt-1">{lostExcludingAgedOut} players × ${activeData.fee.toLocaleString()} avg fee</p>
-                  </div>
+              <Scorecard label="2025–26 Players
