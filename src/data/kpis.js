@@ -1,79 +1,62 @@
 // src/data/kpis.js
+import { KPIS_URL } from "./sheet";
 
+// Convierte "1,234" / "$1,234" / "56.2%" a número
+function toNumber(v) {
+  if (v == null) return 0;
+  const s = String(v).trim();
+  if (!s) return 0;
+  const cleaned = s
+    .replace(/\$/g, "")
+    .replace(/%/g, "")
+    .replace(/,/g, "")
+    .trim();
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Lee un CSV simple y devuelve filas como objetos usando headers
 function parseCSV(text) {
-  // parser simple (ok si el CSV no trae comillas con comas internas)
-  const lines = text.trim().split(/\r?\n/);
+  const lines = text.replace(/\r/g, "").split("\n").filter(Boolean);
+  if (lines.length < 2) return [];
+
   const headers = lines[0].split(",").map(h => h.trim());
   return lines.slice(1).map(line => {
     const cols = line.split(",");
-    const row = {};
-    headers.forEach((h, i) => (row[h] = (cols[i] ?? "").trim()));
-    return row;
+    const obj = {};
+    headers.forEach((h, i) => (obj[h] = (cols[i] ?? "").trim()));
+    return obj;
   });
 }
 
-function normGender(g) {
-  const s = String(g || "").toLowerCase();
-  if (s.startsWith("b")) return "boys";
-  if (s.startsWith("g")) return "girls";
-  return "club";
-}
+/**
+ * Espera que tu hoja KPIs tenga columnas (headers) como:
+ * segment,totalLastYear,totalThisYear,netChange,retained,lost,new,avgFee
+ *
+ * segment: club | boys | girls
+ */
+export async function fetchKpis() {
+  const res = await fetch(KPIS_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`KPIS fetch failed: ${res.status}`);
+  const csv = await res.text();
+  const rows = parseCSV(csv);
 
-function isYes(v) {
-  return String(v || "").trim().toUpperCase() === "Y";
-}
-
-// Espera headers típicos del RAW_PlayerMaster:
-// Gender, Registered Last Yr (Y/N), Registered This Yr (Y/N)
-export function buildGenderKpisFromPlayers(rows) {
-  const base = {
-    totalLastYear: 0,
-    totalThisYear: 0,
-    retained: 0,
-    lost: 0,
-    new: 0,
-  };
-
-  const out = {
-    club: { ...base },
-    boys: { ...base },
-    girls: { ...base },
-  };
-
+  // Convertimos a diccionario por segment
+  const out = {};
   for (const r of rows) {
-    const g = normGender(r["Gender"]);
-    const regLast = isYes(r["Registered Last Yr (Y/N)"]);
-    const regThis = isYes(r["Registered This Yr (Y/N)"]);
+    const segment = (r.segment || "").toLowerCase().trim();
+    if (!segment) continue;
 
-    // club
-    if (regLast) out.club.totalLastYear += 1;
-    if (regThis) out.club.totalThisYear += 1;
-    if (regLast && regThis) out.club.retained += 1;
-    if (regLast && !regThis) out.club.lost += 1;
-    if (!regLast && regThis) out.club.new += 1;
-
-    // boys / girls
-    if (g === "boys" || g === "girls") {
-      if (regLast) out[g].totalLastYear += 1;
-      if (regThis) out[g].totalThisYear += 1;
-      if (regLast && regThis) out[g].retained += 1;
-      if (regLast && !regThis) out[g].lost += 1;
-      if (!regLast && regThis) out[g].new += 1;
-    }
+    out[segment] = {
+      totalLastYear: toNumber(r.totalLastYear),
+      totalThisYear: toNumber(r.totalThisYear),
+      netChange: toNumber(r.netChange),
+      retained: toNumber(r.retained),
+      lost: toNumber(r.lost),
+      new: toNumber(r.new),
+      avgFee: toNumber(r.avgFee) || 3000,
+    };
   }
 
-  // netChange
-  for (const key of ["club", "boys", "girls"]) {
-    out[key].netChange = out[key].totalThisYear - out[key].totalLastYear;
-  }
-
-  return out;
-}
-
-export async function fetchPlayersAndBuildKpis(playersCsvUrl) {
-  const res = await fetch(playersCsvUrl);
-  if (!res.ok) throw new Error(`Players CSV fetch failed: ${res.status}`);
-  const text = await res.text();
-  const rows = parseCSV(text);
-  return buildGenderKpisFromPlayers(rows);
+  return out; // { club: {...}, boys: {...}, girls: {...} }
 }
