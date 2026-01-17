@@ -9,9 +9,11 @@ import {
   AlertTriangle, TrendingDown, UserPlus, UserCheck, LogOut, Download, Info
 } from "lucide-react";
 
+
 /* -------------------------------------------------------------------------- */
 /* CONFIGURATION                                                               */
 /* -------------------------------------------------------------------------- */
+
 
 const getEnvVar = (key) => {
   try {
@@ -20,6 +22,7 @@ const getEnvVar = (key) => {
     return "";
   }
 };
+
 
 const URLS = {
   KPIS: getEnvVar("VITE_SHEET_KPIS_CSV"),
@@ -30,9 +33,11 @@ const URLS = {
   PLAYERS: getEnvVar("VITE_SHEET_PLAYERS_CSV")
 };
 
+
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                     */
 /* -------------------------------------------------------------------------- */
+
 
 function parseCSV(text) {
   const rows = [];
@@ -55,6 +60,7 @@ function parseCSV(text) {
   return rows.filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
 }
 
+
 function rowsToObjects(rows) {
   if (!rows?.length) return [];
   const headers = rows[0].map((h) => String(h || "").trim());
@@ -68,12 +74,14 @@ function rowsToObjects(rows) {
   return out;
 }
 
+
 function toNumber(x) {
   if (typeof x === "number") return x;
   const clean = String(x ?? "").replace(/\$/g, "").replace(/,/g, "").replace(/%/g, "").trim();
   const n = Number(clean);
   return Number.isFinite(n) ? n : 0;
 }
+
 
 function pick(obj, candidates) {
   const keys = Object.keys(obj || {});
@@ -84,6 +92,7 @@ function pick(obj, candidates) {
   return "";
 }
 
+
 function normalizePercent(val) {
   const n = toNumber(val);
   if (n > 1 && n <= 100) return n;
@@ -91,6 +100,7 @@ function normalizePercent(val) {
   if (n > 10000) return Math.round(n / 1000000);
   return n;
 }
+
 
 function exportToCSV(data, filename) {
   if (!data || data.length === 0) return;
@@ -106,6 +116,7 @@ function exportToCSV(data, filename) {
     }).join(','))
   ].join('\n');
 
+
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -113,14 +124,16 @@ function exportToCSV(data, filename) {
   link.click();
 }
 
+
 /* -------------------------------------------------------------------------- */
 /* COMPONENTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
+
 // Player Modal
 const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
   if (!isOpen) return null;
-  
+ 
   const handleExport = () => {
     exportToCSV(players.map(p => ({
       Name: p.name,
@@ -130,6 +143,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
     })), title.replace(/[^a-zA-Z0-9]/g, '_'));
   };
 
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-[#111827] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-700/50">
@@ -138,8 +152,8 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
             <h3 className="font-bold text-white text-lg">{title}</h3>
             <p className="text-xs text-slate-400">{subtitle || `${players.length} players`}</p>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors text-slate-400 hover:text-white"
           >
             <X size={20} />
@@ -154,8 +168,8 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
                 <li key={i} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/30">
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold ${
-                      p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' : 
-                      p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' : 
+                      p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' :
+                      p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' :
                       'bg-blue-500/20 text-blue-400'
                     }`}>
                       {p.name ? p.name.charAt(0).toUpperCase() : '?'}
@@ -168,8 +182,8 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
                   <div className="flex items-center gap-2">
                     {p.gender && (
                       <span className={`text-xs px-2 py-0.5 rounded ${
-                        p.gender.toLowerCase() === 'boys' || p.gender.toUpperCase() === 'M' 
-                          ? 'bg-blue-500/20 text-blue-400' 
+                        p.gender.toLowerCase() === 'boys' || p.gender.toUpperCase() === 'M'
+                          ? 'bg-blue-500/20 text-blue-400'
                           : 'bg-pink-500/20 text-pink-400'
                       }`}>
                         {p.gender.toLowerCase() === 'boys' || p.gender.toUpperCase() === 'M' ? '♂' : '♀'}
@@ -177,7 +191,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
                     )}
                     {p.status && (
                       <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
-                        p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' : 
+                        p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' :
                         p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' :
                         p.status === 'Retained' ? 'bg-blue-500/20 text-blue-400' :
                         'bg-slate-700 text-slate-400'
@@ -192,7 +206,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
           )}
         </div>
         <div className="p-4 bg-slate-800/30 border-t border-slate-700/50 flex justify-between items-center">
-          <button 
+          <button
             onClick={handleExport}
             className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1"
           >
@@ -207,12 +221,13 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
   );
 };
 
+
 // Scorecard
 const Scorecard = ({ label, value, sub, highlight, colorClass = "", onClick, clickable }) => (
-  <div 
+  <div
     className={`p-6 rounded-2xl flex flex-col justify-center transition-all duration-300 border ${
-      highlight 
-        ? "bg-gradient-to-br from-blue-600 to-blue-700 border-blue-500/50 shadow-lg shadow-blue-500/20" 
+      highlight
+        ? "bg-gradient-to-br from-blue-600 to-blue-700 border-blue-500/50 shadow-lg shadow-blue-500/20"
         : "bg-[#111827] border-slate-700/50"
     } ${clickable ? "cursor-pointer hover:border-blue-500/50" : ""}`}
     onClick={clickable ? onClick : undefined}
@@ -229,9 +244,10 @@ const Scorecard = ({ label, value, sub, highlight, colorClass = "", onClick, cli
   </div>
 );
 
+
 // KPI Box
 const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick, clickable, tooltip }) => (
-  <div 
+  <div
     className={`bg-[#111827] p-5 rounded-2xl border border-slate-700/50 flex flex-col justify-between ${
       clickable ? "cursor-pointer hover:border-blue-500/50 transition-all" : ""
     }`}
@@ -252,8 +268,8 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
         )}
         {percent && (
           <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
-            trend === "up" ? "bg-emerald-500/20 text-emerald-400" : 
-            trend === "down" ? "bg-rose-500/20 text-rose-400" : 
+            trend === "up" ? "bg-emerald-500/20 text-emerald-400" :
+            trend === "down" ? "bg-rose-500/20 text-rose-400" :
             "bg-slate-700 text-slate-400"
           }`}>
             {percent}
@@ -265,8 +281,8 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</p>
       <h3 className="text-3xl font-black text-white">{value}</h3>
       <p className={`text-xs mt-1 font-medium ${
-        trend === "up" ? "text-emerald-400" : 
-        trend === "down" ? "text-rose-400" : 
+        trend === "up" ? "text-emerald-400" :
+        trend === "down" ? "text-rose-400" :
         "text-slate-500"
       }`}>
         {sub}
@@ -277,6 +293,7 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
     )}
   </div>
 );
+
 
 // Custom Tooltip
 const CustomTooltip = ({ active, payload, label }) => {
@@ -296,9 +313,11 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
+
 /* -------------------------------------------------------------------------- */
 /* MAIN COMPONENT                                                              */
 /* -------------------------------------------------------------------------- */
+
 
 export default function WayneDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -306,15 +325,17 @@ export default function WayneDashboard({ onLogout }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [modal, setModal] = useState({ open: false, title: "", players: [], subtitle: "" });
   const [selectedEntity, setSelectedEntity] = useState({ type: 'coach', id: '' });
-  
+ 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
 
   const [kpisGender, setKpisGender] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [ageDiag, setAgeDiag] = useState([]);
   const [teams, setTeams] = useState([]);
   const [playerList, setPlayerList] = useState([]);
+
 
   // Load data
   useEffect(() => {
@@ -360,6 +381,7 @@ export default function WayneDashboard({ onLogout }) {
           return;
         }
 
+
         const responses = await Promise.all([
           fetch(URLS.KPIS_GENDER).then(res => res.text()),
           fetch(URLS.PROGRAMS).then(res => res.text()),
@@ -368,7 +390,9 @@ export default function WayneDashboard({ onLogout }) {
           fetch(URLS.PLAYERS).then(res => res.text()),
         ]);
 
+
         const [kpiText, progText, ageText, teamText, playerText] = responses;
+
 
         // KPIs by Gender
         const kpiRows = rowsToObjects(parseCSV(kpiText));
@@ -388,6 +412,7 @@ export default function WayneDashboard({ onLogout }) {
         });
         setKpisGender(kpiMap);
 
+
         // Programs
         const progRows = rowsToObjects(parseCSV(progText));
         setPrograms(progRows.map(r => {
@@ -404,12 +429,13 @@ export default function WayneDashboard({ onLogout }) {
           };
         }));
 
+
         // Age Diagnostic
-        const ageRows = rowsToObjects(parseCSV(ageText));
-        setAgeDiag(ageRows.map(r => ({
-          year: pick(r, ["year", "Year"]),
-          rate: normalizePercent(pick(r, ["rate", "Rate"])),
-          playersLast: toNumber(pick(r, ["playersLast", "Players Last"])) || toNumber(pick(r, ["players", "Players"])),
+          const ageRows = rowsToObjects(parseCSV(ageText));
+          setAgeDiag(ageRows.map(r => ({
+            year: pick(r, ["year", "Year"]),
+            rate: normalizePercent(pick(r, ["rate", "Rate"])),
+            playersLast: toNumber(pick(r, ["playersLast", "Players Last"])) || toNumber(pick(r, ["players", "Players"])),
           playersThis: toNumber(pick(r, ["playersThis", "Players This"])) || toNumber(pick(r, ["players", "Players"])),
           retained: toNumber(pick(r, ["retained", "Retained"])),
           boysLast: toNumber(pick(r, ["boysLast", "Boys Last"])),
@@ -417,6 +443,7 @@ export default function WayneDashboard({ onLogout }) {
           girlsLast: toNumber(pick(r, ["girlsLast", "Girls Last"])),
           girlsThis: toNumber(pick(r, ["girlsThis", "Girls This"]))
         })));
+
 
         // Teams
         const teamRows = rowsToObjects(parseCSV(teamText));
@@ -434,6 +461,7 @@ export default function WayneDashboard({ onLogout }) {
           };
         }));
 
+
         // Players
         const playerRows = rowsToObjects(parseCSV(playerText));
         setPlayerList(playerRows.map(r => {
@@ -441,19 +469,21 @@ export default function WayneDashboard({ onLogout }) {
           const regThis = pick(r, ["Registered This Yr (Y/N)", "Registered This Yr", "in_25_26"]);
           const teamLast = pick(r, ["Team (Last Yr)", "team_last"]);
           const ageGroupLast = pick(r, ["Age Group (Last Yr)", "age_group_last"]);
-          
+         
           let status = "Unknown";
           if (regLast === 'Y' && regThis === 'Y') status = "Retained";
           else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
           else if (regLast !== 'Y' && regThis === 'Y') status = "New";
 
-          const isAgedOut = 
-            teamLast?.includes('06/07') || 
-            teamLast?.includes('2006') || 
+
+          const isAgedOut =
+            teamLast?.includes('06/07') ||
+            teamLast?.includes('2006') ||
             teamLast?.includes('2005') ||
             ageGroupLast?.includes('U19') ||
             ageGroupLast?.includes('2006') ||
             ageGroupLast?.includes('2005');
+
 
           let gender = pick(r, ["gender", "Gender"]) || "";
           if (!gender) {
@@ -462,6 +492,7 @@ export default function WayneDashboard({ onLogout }) {
           }
           if (gender.toUpperCase() === 'M' || gender.toLowerCase() === 'male') gender = "Boys";
           if (gender.toUpperCase() === 'F' || gender.toLowerCase() === 'female') gender = "Girls";
+
 
           return {
             name: `${pick(r, ["first_name", "First Name"])} ${pick(r, ["last_name", "Last Name"])}`.trim(),
@@ -473,6 +504,7 @@ export default function WayneDashboard({ onLogout }) {
           };
         }));
 
+
       } catch (e) {
         console.error("Fetch Error:", e);
         setErr("Failed to load data.");
@@ -483,27 +515,32 @@ export default function WayneDashboard({ onLogout }) {
     loadData();
   }, []);
 
+
   // Active data based on filter
   const activeData = kpisGender?.[genderFilter] ?? {
     totalLast: 0, totalThis: 0, net: 0, retained: 0, lost: 0, new: 0, fee: 3000, agedOut: 0
   };
 
+
   // Calculate metrics
   const agedOut = activeData.agedOut || 0;
   const lostExcludingAgedOut = Math.max(0, activeData.lost - agedOut);
-  
-  const retentionPercent = activeData.totalLast > 0 
+ 
+  const retentionPercent = activeData.totalLast > 0
     ? Math.round((activeData.retained / activeData.totalLast) * 100) : 0;
-  
-  const churnPercent = activeData.totalLast > 0 
+ 
+  const churnPercent = activeData.totalLast > 0
     ? Math.round((lostExcludingAgedOut / activeData.totalLast) * 100) : 0;
 
+
   const eligibleBase = activeData.totalLast - agedOut;
-  const eligibleRetentionPercent = eligibleBase > 0 
+  const eligibleRetentionPercent = eligibleBase > 0
     ? Math.round((activeData.retained / eligibleBase) * 100) : 0;
+
 
   const changePercent = activeData.totalLast > 0
     ? Math.round(((activeData.totalThis - activeData.totalLast) / activeData.totalLast) * 100) : 0;
+
 
   // Revenue
   const exactRevenueLost = useMemo(() => {
@@ -515,8 +552,10 @@ export default function WayneDashboard({ onLogout }) {
     return relevantTeams.reduce((total, team) => total + (team.lost * team.fee), 0);
   }, [teams, genderFilter]);
 
+
   const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (lostExcludingAgedOut * activeData.fee);
   const potentialRecovery = Math.round(displayRevenueLost * 0.3);
+
 
   // Filter teams
   const filteredTeams = useMemo(() => {
@@ -528,26 +567,28 @@ export default function WayneDashboard({ onLogout }) {
     });
   }, [teams, searchTerm, genderFilter]);
 
+
   // Gender comparison data
   const genderComparisonData = useMemo(() => {
     if (!kpisGender) return [];
     return [
-      { 
-        name: "Boys", 
-        lastYear: kpisGender.boys?.totalLast || 0, 
+      {
+        name: "Boys",
+        lastYear: kpisGender.boys?.totalLast || 0,
         thisYear: kpisGender.boys?.totalThis || 0,
-        change: kpisGender.boys && kpisGender.boys.totalLast > 0 
+        change: kpisGender.boys && kpisGender.boys.totalLast > 0
           ? Math.round(((kpisGender.boys.totalThis - kpisGender.boys.totalLast) / kpisGender.boys.totalLast) * 100) : 0
       },
-      { 
-        name: "Girls", 
-        lastYear: kpisGender.girls?.totalLast || 0, 
+      {
+        name: "Girls",
+        lastYear: kpisGender.girls?.totalLast || 0,
         thisYear: kpisGender.girls?.totalThis || 0,
-        change: kpisGender.girls && kpisGender.girls.totalLast > 0 
+        change: kpisGender.girls && kpisGender.girls.totalLast > 0
           ? Math.round(((kpisGender.girls.totalThis - kpisGender.girls.totalLast) / kpisGender.girls.totalLast) * 100) : 0
       }
     ];
   }, [kpisGender]);
+
 
   // Age comparison data
   const ageComparisonData = useMemo(() => {
@@ -556,6 +597,7 @@ export default function WayneDashboard({ onLogout }) {
       change: a.playersLast > 0 ? Math.round(((a.playersThis - a.playersLast) / a.playersLast) * 100) : 0
     }));
   }, [ageDiag]);
+
 
   // Pie chart data
   const genderPieData = useMemo(() => {
@@ -566,21 +608,23 @@ export default function WayneDashboard({ onLogout }) {
     ];
   }, [kpisGender]);
 
+
   // Deep Dive
   const deepDiveStats = useMemo(() => {
     if (!selectedEntity.id) return null;
-    
-    const relevantTeams = selectedEntity.type === 'coach' 
+   
+    const relevantTeams = selectedEntity.type === 'coach'
       ? teams.filter(t => t.coach === selectedEntity.id)
       : teams.filter(t => t.name === selectedEntity.id);
-    
+   
     if (relevantTeams.length === 0) return null;
+
 
     const totalLost = relevantTeams.reduce((acc, curr) => acc + curr.lost, 0);
     const totalRet = relevantTeams.reduce((acc, curr) => acc + curr.retained, 0);
     const totalLast = relevantTeams.reduce((acc, curr) => acc + curr.lastYear, 0);
     const lostRevenue = relevantTeams.reduce((acc, curr) => acc + (curr.lost * curr.fee), 0);
-    
+   
     return {
       name: selectedEntity.id,
       teams: relevantTeams,
@@ -592,13 +636,15 @@ export default function WayneDashboard({ onLogout }) {
     };
   }, [selectedEntity, teams]);
 
+
   const uniqueCoaches = useMemo(() => [...new Set(teams.map(t => t.coach).filter(c => c && c !== "Unassigned"))].sort(), [teams]);
   const uniqueTeams = useMemo(() => [...new Set(teams.map(t => t.name))].sort(), [teams]);
+
 
   // Open player modal - FIXED gender filter
   const handleOpenPlayerList = (filter, title) => {
     let matchedPlayers = [];
-    
+   
     if (typeof filter === 'string') {
       matchedPlayers = playerList.filter(p => p.status === filter);
     } else if (filter.team && filter.status) {
@@ -610,20 +656,23 @@ export default function WayneDashboard({ onLogout }) {
       matchedPlayers = playerList.filter(p => p.status === filter.status);
     }
 
+
     // Exclude aged out if "Lost"
     if (filter === 'Lost' || filter.status === 'Lost') {
       matchedPlayers = matchedPlayers.filter(p => !p.agedOut);
     }
 
+
     // FIXED: Filter by gender correctly
     if (genderFilter !== 'club') {
       matchedPlayers = matchedPlayers.filter(p => {
         const playerGender = (p.gender || "").toLowerCase();
-        return playerGender === genderFilter || 
+        return playerGender === genderFilter ||
                (genderFilter === 'boys' && (playerGender === 'boys' || playerGender === 'm' || playerGender === 'male')) ||
                (genderFilter === 'girls' && (playerGender === 'girls' || playerGender === 'f' || playerGender === 'female'));
       });
     }
+
 
     setModal({
       open: true,
@@ -632,6 +681,7 @@ export default function WayneDashboard({ onLogout }) {
       subtitle: `${genderFilter !== 'club' ? genderFilter.charAt(0).toUpperCase() + genderFilter.slice(1) + ' only - ' : ''}${matchedPlayers.length} players`
     });
   };
+
 
   // Export all
   const handleExportAll = () => {
@@ -646,6 +696,7 @@ export default function WayneDashboard({ onLogout }) {
     exportToCSV(allData, 'RetainPlayers_Full_Export');
   };
 
+
   // Logout
   const handleLogout = () => {
     localStorage.removeItem("rp_authenticated");
@@ -653,18 +704,20 @@ export default function WayneDashboard({ onLogout }) {
     onLogout();
   };
 
+
   return (
     <div className="min-h-screen bg-[#0a1628] p-4 md:p-6 font-sans text-white">
-      <PlayerModal 
-        isOpen={modal.open} 
-        onClose={() => setModal({ ...modal, open: false })} 
-        title={modal.title} 
+      <PlayerModal
+        isOpen={modal.open}
+        onClose={() => setModal({ ...modal, open: false })}
+        title={modal.title}
         players={modal.players}
         subtitle={modal.subtitle}
       />
 
+
       <div className="max-w-7xl mx-auto">
-        
+       
         {/* HEADER */}
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-700/50 pb-6">
           <div>
@@ -680,6 +733,7 @@ export default function WayneDashboard({ onLogout }) {
             </p>
           </div>
 
+
           <div className="flex flex-col items-end gap-3">
             <div className="flex items-center gap-3">
               <button
@@ -693,6 +747,7 @@ export default function WayneDashboard({ onLogout }) {
               </button>
             </div>
 
+
             {/* Gender Filter */}
             <div className="flex bg-[#111827] p-1 rounded-xl border border-slate-700/50">
               {[
@@ -704,8 +759,8 @@ export default function WayneDashboard({ onLogout }) {
                   key={item.id}
                   onClick={() => setGenderFilter(item.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                    genderFilter === item.id 
-                      ? "bg-blue-600 text-white" 
+                    genderFilter === item.id
+                      ? "bg-blue-600 text-white"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -714,6 +769,7 @@ export default function WayneDashboard({ onLogout }) {
                 </button>
               ))}
             </div>
+
 
             {/* Tabs */}
             <nav className="flex bg-[#111827] rounded-xl p-1 gap-1 border border-slate-700/50">
@@ -728,8 +784,8 @@ export default function WayneDashboard({ onLogout }) {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                    activeTab === tab.id 
-                      ? "bg-slate-700 text-white" 
+                    activeTab === tab.id
+                      ? "bg-slate-700 text-white"
                       : "text-slate-500 hover:text-white"
                   }`}
                 >
@@ -739,6 +795,7 @@ export default function WayneDashboard({ onLogout }) {
             </nav>
           </div>
         </div>
+
 
         {/* LOADING */}
         {loading && (
@@ -753,6 +810,7 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
+
         {/* ==================== OVERVIEW TAB ==================== */}
         {activeTab === "overview" && (
           <>
@@ -760,58 +818,60 @@ export default function WayneDashboard({ onLogout }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
               <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" />
-              <Scorecard 
-                label="Net Change" 
-                value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} 
-                sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`} 
-                highlight 
+              <Scorecard
+                label="Net Change"
+                value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`}
+                sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`}
+                highlight
               />
             </div>
 
+
             {/* KPI Boxes */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <KPIBox 
-                title="Retained" 
-                value={activeData.retained.toLocaleString()} 
+              <KPIBox
+                title="Retained"
+                value={activeData.retained.toLocaleString()}
                 sub="Stayed from last season"
-                percent={`${retentionPercent}%`} 
-                icon={UserCheck} 
-                color="bg-blue-600" 
+                percent={`${retentionPercent}%`}
+                icon={UserCheck}
+                color="bg-blue-600"
                 trend="up"
-                clickable 
+                clickable
                 onClick={() => handleOpenPlayerList({ status: 'Retained' }, 'Retained Players')}
               />
-              <KPIBox 
-                title="Lost (Churn)" 
-                value={lostExcludingAgedOut.toLocaleString()} 
+              <KPIBox
+                title="Lost (Churn)"
+                value={lostExcludingAgedOut.toLocaleString()}
                 sub="Did not return (excl. aged out)"
-                percent={`${churnPercent}%`} 
-                icon={UserMinus} 
-                color="bg-rose-500" 
+                percent={`${churnPercent}%`}
+                icon={UserMinus}
+                color="bg-rose-500"
                 trend="down"
                 tooltip="Excludes players who naturally graduated (U19)"
-                clickable 
+                clickable
                 onClick={() => handleOpenPlayerList({ status: 'Lost' }, 'Lost Players (excl. aged out)')}
               />
-              <KPIBox 
-                title="New Players" 
-                value={activeData.new.toLocaleString()} 
+              <KPIBox
+                title="New Players"
+                value={activeData.new.toLocaleString()}
                 sub="First time this season"
-                icon={UserPlus} 
-                color="bg-emerald-600" 
+                icon={UserPlus}
+                color="bg-emerald-600"
                 trend="up"
-                clickable 
+                clickable
                 onClick={() => handleOpenPlayerList({ status: 'New' }, 'New Players')}
               />
-              <KPIBox 
-                title="Eligible Retention" 
-                value={`${eligibleRetentionPercent}%`} 
+              <KPIBox
+                title="Eligible Retention"
+                value={`${eligibleRetentionPercent}%`}
                 sub={`Retained ÷ (${activeData.totalLast} - ${agedOut} aged out)`}
-                icon={Target} 
+                icon={Target}
                 color="bg-indigo-600"
                 tooltip="Retention rate excluding players who aged out"
               />
             </div>
+
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -837,6 +897,7 @@ export default function WayneDashboard({ onLogout }) {
                   </ResponsiveContainer>
                 </div>
               </div>
+
 
               {/* Gender Split */}
               <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
@@ -882,6 +943,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+
             {/* Alert Banner */}
             <div className="bg-gradient-to-r from-rose-500/20 to-rose-600/10 border border-rose-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -897,6 +959,7 @@ export default function WayneDashboard({ onLogout }) {
             </div>
           </>
         )}
+
 
         {/* ==================== DIAGNOSIS TAB ==================== */}
         {activeTab === "diagnosis" && (
@@ -921,6 +984,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+
             {/* Year change cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {ageComparisonData.slice(0, 6).map((a, idx) => (
@@ -933,6 +997,7 @@ export default function WayneDashboard({ onLogout }) {
                 </div>
               ))}
             </div>
+
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 border border-rose-500/30 p-5 rounded-2xl">
@@ -954,6 +1019,7 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
+
         {/* ==================== FINANCIALS TAB ==================== */}
         {activeTab === "financials" && (
           <div className="space-y-6">
@@ -972,6 +1038,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
@@ -986,6 +1053,7 @@ export default function WayneDashboard({ onLogout }) {
                 <p className="text-sm text-slate-500">From {lostExcludingAgedOut} players who didn't return</p>
               </div>
 
+
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-emerald-500/20 rounded-xl">
@@ -998,6 +1066,7 @@ export default function WayneDashboard({ onLogout }) {
                 </div>
                 <p className="text-sm text-slate-500">From {activeData.new} new players</p>
               </div>
+
 
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
@@ -1014,6 +1083,7 @@ export default function WayneDashboard({ onLogout }) {
                 <p className="text-sm text-slate-500">Net change of {activeData.net} players</p>
               </div>
             </div>
+
 
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-lg shadow-emerald-500/20">
               <div className="flex flex-col md:flex-row items-center justify-between gap-5">
@@ -1033,10 +1103,11 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-bold text-white">Top Revenue Losses by Team</h4>
-                <button 
+                <button
                   onClick={() => exportToCSV(filteredTeams.map(t => ({
                     Team: t.name,
                     Program: t.program,
@@ -1067,6 +1138,7 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
+
         {/* ==================== TEAMS TAB ==================== */}
         {activeTab === "full-roster" && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
@@ -1086,7 +1158,7 @@ export default function WayneDashboard({ onLogout }) {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <button 
+                <button
                   onClick={() => exportToCSV(filteredTeams, 'Teams_Export')}
                   className="p-2.5 bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
                 >
@@ -1094,7 +1166,7 @@ export default function WayneDashboard({ onLogout }) {
                 </button>
               </div>
             </div>
-            
+           
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -1120,7 +1192,7 @@ export default function WayneDashboard({ onLogout }) {
                         <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
                         <td className="py-4 text-center text-slate-400">{team.lastYear}</td>
                         <td className="py-4 text-center">
-                          <button 
+                          <button
                             onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)}
                             className="text-blue-400 font-bold hover:underline"
                           >
@@ -1128,7 +1200,7 @@ export default function WayneDashboard({ onLogout }) {
                           </button>
                         </td>
                         <td className="py-4 text-center">
-                          <button 
+                          <button
                             onClick={() => handleOpenPlayerList({ team: team.name, status: 'Lost' }, `Lost: ${team.name}`)}
                             className="text-rose-400 font-bold hover:underline"
                           >
@@ -1156,6 +1228,7 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
+
         {/* ==================== DEEP DIVE TAB ==================== */}
         {activeTab === "deep-dive" && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -1164,7 +1237,7 @@ export default function WayneDashboard({ onLogout }) {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-bold text-blue-400 uppercase mb-2 block">By Coach</label>
-                  <select 
+                  <select
                     className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl p-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     onChange={(e) => setSelectedEntity({ type: 'coach', id: e.target.value })}
                     value={selectedEntity.type === 'coach' ? selectedEntity.id : ''}
@@ -1176,7 +1249,7 @@ export default function WayneDashboard({ onLogout }) {
                 <div className="text-center text-slate-600 text-xs font-bold">OR</div>
                 <div>
                   <label className="text-xs font-bold text-indigo-400 uppercase mb-2 block">By Team</label>
-                  <select 
+                  <select
                     className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl p-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                     onChange={(e) => setSelectedEntity({ type: 'team', id: e.target.value })}
                     value={selectedEntity.type === 'team' ? selectedEntity.id : ''}
@@ -1187,6 +1260,7 @@ export default function WayneDashboard({ onLogout }) {
                 </div>
               </div>
             </div>
+
 
             <div className="lg:col-span-3">
               {deepDiveStats ? (
@@ -1221,6 +1295,7 @@ export default function WayneDashboard({ onLogout }) {
                     </div>
                   </div>
 
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {deepDiveStats.teams.map((t, idx) => {
                       const teamRetRate = t.lastYear > 0 ? Math.round((t.retained / t.lastYear) * 100) : 0;
@@ -1254,13 +1329,13 @@ export default function WayneDashboard({ onLogout }) {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <button 
+                            <button
                               onClick={() => handleOpenPlayerList({ team: t.name, status: 'Retained' }, `Retained: ${t.name}`)}
                               className="flex-1 text-xs bg-blue-500/20 text-blue-400 px-3 py-2 rounded-lg font-bold hover:bg-blue-500/30 transition-colors"
                             >
                               View Retained
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleOpenPlayerList({ team: t.name, status: 'Lost' }, `Lost: ${t.name}`)}
                               className="flex-1 text-xs bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg font-bold hover:bg-rose-500/30 transition-colors"
                             >
@@ -1284,6 +1359,7 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
+
         {/* FOOTER */}
         <footer className="mt-10 py-6 border-t border-slate-700/50 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
           <p>RetainPlayers • Player Retention Intelligence</p>
@@ -1296,3 +1372,6 @@ export default function WayneDashboard({ onLogout }) {
     </div>
   );
 }
+
+
+
