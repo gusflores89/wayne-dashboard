@@ -10,21 +10,6 @@ import {
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/* BRAND COLORS - RetainPlayers                                                */
-/* Add to index.html: <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet"> */
-/* -------------------------------------------------------------------------- */
-const BRAND = {
-  primary: '#5DB3F5',      // Light blue - main accent
-  secondary: '#3A7FC3',    // Medium blue - buttons, links
-  dark: '#2F6DB3',         // Dark blue - text highlights
-  accent: '#4491D3',       // Secondary elements
-  highlight: '#82C3FF',    // Highlights
-  pale: '#D2E6F5',         // Light backgrounds
-  bgDark: '#0C1B46',       // Main background
-  bgDarker: '#070D1F',     // Darker background (cards)
-};
-
-/* -------------------------------------------------------------------------- */
 /* CONFIGURATION                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -147,15 +132,15 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#070D1F] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-[#3A7FC3]/50">
-        <div className="p-5 border-b border-[#3A7FC3]/30 flex justify-between items-center">
+      <div className="bg-[#111827] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-700/50">
+        <div className="p-5 border-b border-slate-700/50 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-white text-lg">{title}</h3>
             <p className="text-xs text-slate-400">{subtitle || `${players.length} players`}</p>
           </div>
           <button 
             onClick={onClose} 
-            className="p-2 hover:bg-[#3A7FC3]/20 rounded-lg transition-colors text-slate-400 hover:text-white"
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors text-slate-400 hover:text-white"
           >
             <X size={20} />
           </button>
@@ -166,12 +151,12 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
           ) : (
             <ul className="space-y-2">
               {players.map((p, i) => (
-                <li key={i} className="flex items-center justify-between p-3 bg-[#0C1B46] rounded-xl border border-[#3A7FC3]/20">
+                <li key={i} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/30">
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold ${
                       p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' : 
                       p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' : 
-                      'bg-[#3A7FC3]/20 text-[#5DB3F5]'
+                      'bg-blue-500/20 text-blue-400'
                     }`}>
                       {p.name ? p.name.charAt(0).toUpperCase() : '?'}
                     </div>
@@ -184,7 +169,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
                     {p.gender && (
                       <span className={`text-xs px-2 py-0.5 rounded ${
                         p.gender.toLowerCase() === 'boys' || p.gender.toUpperCase() === 'M' 
-                          ? 'bg-[#3A7FC3]/20 text-[#5DB3F5]' 
+                          ? 'bg-blue-500/20 text-blue-400' 
                           : 'bg-pink-500/20 text-pink-400'
                       }`}>
                         {p.gender.toLowerCase() === 'boys' || p.gender.toUpperCase() === 'M' ? '♂' : '♀'}
@@ -194,7 +179,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
                       <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
                         p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' : 
                         p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' :
-                        p.status === 'Retained' ? 'bg-[#3A7FC3]/20 text-[#5DB3F5]' :
+                        p.status === 'Retained' ? 'bg-blue-500/20 text-blue-400' :
                         'bg-slate-700 text-slate-400'
                       }`}>
                         {p.status}
@@ -206,10 +191,10 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
             </ul>
           )}
         </div>
-        <div className="p-4 bg-[#0C1B46] border-t border-[#3A7FC3]/30 flex justify-between items-center">
+        <div className="p-4 bg-slate-800/30 border-t border-slate-700/50 flex justify-between items-center">
           <button 
             onClick={handleExport}
-            className="text-xs font-bold text-[#5DB3F5] hover:text-[#82C3FF] flex items-center gap-1"
+            className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1"
           >
             <Download size={14} /> Export CSV
           </button>
@@ -227,18 +212,18 @@ const Scorecard = ({ label, value, sub, highlight, colorClass = "", onClick, cli
   <div 
     className={`p-6 rounded-2xl flex flex-col justify-center transition-all duration-300 border ${
       highlight 
-        ? "bg-gradient-to-br from-[#3A7FC3] to-[#2F6DB3] border-[#5DB3F5]/50 shadow-lg shadow-[#3A7FC3]/20" 
-        : "bg-[#070D1F] border-[#3A7FC3]/30"
-    } ${clickable ? "cursor-pointer hover:border-[#5DB3F5]/50" : ""}`}
+        ? "bg-gradient-to-br from-blue-600 to-blue-700 border-blue-500/50 shadow-lg shadow-blue-500/20" 
+        : "bg-[#111827] border-slate-700/50"
+    } ${clickable ? "cursor-pointer hover:border-blue-500/50" : ""}`}
     onClick={clickable ? onClick : undefined}
   >
-    <span className={`text-xs font-bold uppercase tracking-wider mb-2 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>
+    <span className={`text-xs font-bold uppercase tracking-wider mb-2 ${highlight ? "text-blue-200" : "text-slate-500"}`}>
       {label}
     </span>
     <span className={`text-4xl font-black leading-none ${highlight ? "text-white" : colorClass || "text-white"}`}>
       {value}
     </span>
-    <span className={`text-xs font-medium mt-2 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>
+    <span className={`text-xs font-medium mt-2 ${highlight ? "text-blue-200" : "text-slate-500"}`}>
       {sub}
     </span>
   </div>
@@ -247,8 +232,8 @@ const Scorecard = ({ label, value, sub, highlight, colorClass = "", onClick, cli
 // KPI Box
 const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick, clickable, tooltip }) => (
   <div 
-    className={`bg-[#070D1F] p-5 rounded-2xl border border-[#3A7FC3]/30 flex flex-col justify-between ${
-      clickable ? "cursor-pointer hover:border-[#5DB3F5]/50 transition-all" : ""
+    className={`bg-[#111827] p-5 rounded-2xl border border-slate-700/50 flex flex-col justify-between ${
+      clickable ? "cursor-pointer hover:border-blue-500/50 transition-all" : ""
     }`}
     onClick={clickable ? onClick : undefined}
   >
@@ -260,7 +245,7 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
         {tooltip && (
           <div className="group relative">
             <Info size={14} className="text-slate-500 cursor-help" />
-            <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-[#070D1F] text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-[#3A7FC3]/50 pointer-events-none">
+            <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-slate-700 pointer-events-none">
               {tooltip}
             </div>
           </div>
@@ -288,7 +273,7 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
       </p>
     </div>
     {clickable && (
-      <p className="text-xs mt-3 text-[#5DB3F5] font-medium">Click for details →</p>
+      <p className="text-xs mt-3 text-blue-400 font-medium">Click for details →</p>
     )}
   </div>
 );
@@ -297,7 +282,7 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#070D1F] border border-[#3A7FC3]/50 rounded-xl p-3 shadow-xl">
+      <div className="bg-[#1e293b] border border-slate-600/50 rounded-xl p-3 shadow-xl">
         <p className="text-white font-bold text-sm mb-1">{label}</p>
         {payload.map((item, idx) => (
           <p key={idx} className="text-sm" style={{ color: item.color }}>
@@ -610,66 +595,6 @@ export default function WayneDashboard({ onLogout }) {
   const uniqueCoaches = useMemo(() => [...new Set(teams.map(t => t.coach).filter(c => c && c !== "Unassigned"))].sort(), [teams]);
   const uniqueTeams = useMemo(() => [...new Set(teams.map(t => t.name))].sort(), [teams]);
 
-  // Coach Stats for Coaches tab
-  const coachStats = useMemo(() => {
-    if (teams.length === 0) return { coaches: [], clubAvgRate: 0, bestCoach: null, worstCoach: null, totalRevenueDelta: 0 };
-    
-    // Calculate club average retention
-    const totalRetained = teams.reduce((acc, t) => acc + t.retained, 0);
-    const totalPlayers = teams.reduce((acc, t) => acc + t.lastYear, 0);
-    const clubAvgRate = totalPlayers > 0 ? Math.round((totalRetained / totalPlayers) * 100) : 0;
-    const avgFee = activeData.fee || 3000;
-    
-    // Group teams by coach
-    const coachMap = {};
-    teams.forEach(t => {
-      const coachName = t.coach || "Unassigned";
-      if (!coachMap[coachName]) {
-        coachMap[coachName] = {
-          name: coachName,
-          teams: [],
-          totalPlayers: 0,
-          retained: 0,
-          lost: 0,
-          totalFees: 0
-        };
-      }
-      coachMap[coachName].teams.push(t);
-      coachMap[coachName].totalPlayers += t.lastYear;
-      coachMap[coachName].retained += t.retained;
-      coachMap[coachName].lost += t.lost;
-      coachMap[coachName].totalFees += t.fee * t.lastYear;
-    });
-    
-    // Calculate stats for each coach
-    const coaches = Object.values(coachMap).map(coach => {
-      const rate = coach.totalPlayers > 0 ? Math.round((coach.retained / coach.totalPlayers) * 100) : 0;
-      const vsAvg = rate - clubAvgRate;
-      const avgCoachFee = coach.totalPlayers > 0 ? Math.round(coach.totalFees / coach.totalPlayers) : avgFee;
-      // Revenue impact: difference from club average * players * fee
-      const expectedRetained = Math.round(coach.totalPlayers * (clubAvgRate / 100));
-      const revenueImpact = (coach.retained - expectedRetained) * avgCoachFee;
-      
-      return {
-        ...coach,
-        rate,
-        vsAvg,
-        revenueImpact,
-        avgFee: avgCoachFee
-      };
-    }).sort((a, b) => b.rate - a.rate);
-    
-    // Find best and worst (excluding Unassigned)
-    const assignedCoaches = coaches.filter(c => c.name !== "Unassigned" && c.totalPlayers > 0);
-    const bestCoach = assignedCoaches[0] || null;
-    const worstCoach = assignedCoaches[assignedCoaches.length - 1] || null;
-    
-    // Total revenue delta
-    const totalRevenueDelta = coaches.reduce((acc, c) => acc + c.revenueImpact, 0);
-    
-    return { coaches, clubAvgRate, bestCoach, worstCoach, totalRevenueDelta };
-  }, [teams, activeData.fee]);
-
   // Open player modal - FIXED gender filter
   const handleOpenPlayerList = (filter, title) => {
     let matchedPlayers = [];
@@ -729,7 +654,7 @@ export default function WayneDashboard({ onLogout }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0C1B46] p-4 md:p-6 font-sans text-white">
+    <div className="min-h-screen bg-[#0a1628] p-4 md:p-6 font-sans text-white">
       <PlayerModal 
         isOpen={modal.open} 
         onClose={() => setModal({ ...modal, open: false })} 
@@ -741,17 +666,15 @@ export default function WayneDashboard({ onLogout }) {
       <div className="max-w-7xl mx-auto">
         
         {/* HEADER */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#3A7FC3]/30 pb-6">
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-700/50 pb-6">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <img src="/logo.png" alt="RetainPlayers" className="w-12 h-12" />
-              <div>
-                <h1 className="text-2xl font-black text-white tracking-tight" style={{ fontFamily: 'Oswald, sans-serif' }}>
-                  RETAIN<span className="text-[#5DB3F5]">PLAYERS</span>
-                </h1>
-                <span className="text-[#82C3FF] font-bold uppercase tracking-widest text-xs">Retention Intelligence</span>
-              </div>
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck size={16} className="text-blue-400" />
+              <span className="text-blue-400 font-bold uppercase tracking-widest text-xs">Retention Intelligence</span>
             </div>
+            <h1 className="text-3xl font-black text-white tracking-tight">
+              Retain<span className="text-blue-400">Players</span>
+            </h1>
             <p className="text-slate-400 mt-1 text-sm">
               Season: <span className="font-bold text-white">2024-25 vs 2025-26</span>
             </p>
@@ -793,13 +716,12 @@ export default function WayneDashboard({ onLogout }) {
             </div>
 
             {/* Tabs */}
-            <nav className="flex bg-[#111827] rounded-xl p-1 gap-1 border border-slate-700/50 overflow-x-auto">
+            <nav className="flex bg-[#111827] rounded-xl p-1 gap-1 border border-slate-700/50">
               {[
                 { id: "overview", label: "Overview" },
                 { id: "diagnosis", label: "Diagnosis" },
                 { id: "financials", label: "Financials" },
                 { id: "full-roster", label: "Teams" },
-                { id: "coaches", label: "Coaches" },
                 { id: "deep-dive", label: "Deep Dive" }
               ].map((tab) => (
                 <button
@@ -1234,161 +1156,6 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* ==================== COACHES TAB ==================== */}
-        {activeTab === "coaches" && (
-          <div className="space-y-6">
-            {/* Header Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Club Avg Retention</p>
-                <p className="text-3xl font-black text-white">{coachStats.clubAvgRate}%</p>
-                <p className="text-xs text-slate-500 mt-1">Baseline for comparison</p>
-              </div>
-              
-              {coachStats.bestCoach && (
-                <div className="bg-emerald-500/10 p-5 rounded-2xl border border-emerald-500/30">
-                  <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Best Performer</p>
-                  <p className="text-xl font-black text-white">{coachStats.bestCoach.name}</p>
-                  <p className="text-2xl font-black text-emerald-400">{coachStats.bestCoach.rate}%</p>
-                  <p className="text-xs text-emerald-400 mt-1">+{coachStats.bestCoach.vsAvg}% vs avg</p>
-                </div>
-              )}
-              
-              {coachStats.worstCoach && coachStats.worstCoach.name !== coachStats.bestCoach?.name && (
-                <div className="bg-rose-500/10 p-5 rounded-2xl border border-rose-500/30">
-                  <p className="text-xs font-bold text-rose-400 uppercase tracking-wider mb-1">Needs Attention</p>
-                  <p className="text-xl font-black text-white">{coachStats.worstCoach.name}</p>
-                  <p className="text-2xl font-black text-rose-400">{coachStats.worstCoach.rate}%</p>
-                  <p className="text-xs text-rose-400 mt-1">{coachStats.worstCoach.vsAvg}% vs avg</p>
-                </div>
-              )}
-              
-              <div className={`p-5 rounded-2xl border ${coachStats.totalRevenueDelta >= 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'}`}>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Revenue Delta</p>
-                <p className={`text-3xl font-black ${coachStats.totalRevenueDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {coachStats.totalRevenueDelta >= 0 ? '+' : ''}${coachStats.totalRevenueDelta.toLocaleString()}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">Impact vs club average</p>
-              </div>
-            </div>
-
-            {/* Coach Leaderboard */}
-            <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h4 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Award size={20} className="text-amber-400" />
-                    Coach Retention Index
-                  </h4>
-                  <p className="text-slate-400 text-sm">Ranked by retention rate • Click coach name for details</p>
-                </div>
-                <button 
-                  onClick={() => exportToCSV(coachStats.coaches.map(c => ({
-                    Rank: coachStats.coaches.indexOf(c) + 1,
-                    Coach: c.name,
-                    Teams: c.teams.length,
-                    Players: c.totalPlayers,
-                    Retained: c.retained,
-                    Lost: c.lost,
-                    'Rate %': c.rate,
-                    'vs Avg %': c.vsAvg,
-                    'Revenue Impact': c.revenueImpact
-                  })), 'Coach_Retention_Index')}
-                  className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
-                >
-                  <Download size={14} /> Export
-                </button>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-slate-700/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                      <th className="pb-3 pr-4 w-12">Rank</th>
-                      <th className="pb-3 pr-4">Coach</th>
-                      <th className="pb-3 text-center">Teams</th>
-                      <th className="pb-3 text-center">Players</th>
-                      <th className="pb-3 text-center">Retained</th>
-                      <th className="pb-3 text-center">Lost</th>
-                      <th className="pb-3 text-center">Rate</th>
-                      <th className="pb-3 text-center">vs Avg</th>
-                      <th className="pb-3 text-right">Revenue Impact</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {coachStats.coaches.map((coach, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="py-4 pr-4">
-                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                            idx === 0 ? 'bg-amber-500/20 text-amber-400' :
-                            idx === 1 ? 'bg-slate-400/20 text-slate-300' :
-                            idx === 2 ? 'bg-orange-500/20 text-orange-400' :
-                            'bg-slate-700/50 text-slate-500'
-                          }`}>
-                            {idx + 1}
-                          </span>
-                        </td>
-                        <td className="py-4 pr-4">
-                          <button 
-                            onClick={() => {
-                              setSelectedEntity({ type: 'coach', id: coach.name });
-                              setActiveTab('deep-dive');
-                            }}
-                            className="font-bold text-white hover:text-blue-400 transition-colors text-left"
-                          >
-                            {coach.name}
-                          </button>
-                          <p className="text-xs text-slate-500">{coach.teams.map(t => t.name).join(', ')}</p>
-                        </td>
-                        <td className="py-4 text-center text-slate-400">{coach.teams.length}</td>
-                        <td className="py-4 text-center text-slate-400">{coach.totalPlayers}</td>
-                        <td className="py-4 text-center text-blue-400 font-bold">{coach.retained}</td>
-                        <td className="py-4 text-center text-rose-400 font-bold">{coach.lost}</td>
-                        <td className="py-4 text-center">
-                          <span className={`px-2.5 py-1 rounded-lg text-sm font-bold ${
-                            coach.rate >= 70 ? 'bg-emerald-500/20 text-emerald-400' :
-                            coach.rate >= 50 ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-rose-500/20 text-rose-400'
-                          }`}>
-                            {coach.rate}%
-                          </span>
-                        </td>
-                        <td className="py-4 text-center">
-                          <span className={`text-sm font-bold ${coach.vsAvg >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {coach.vsAvg >= 0 ? '+' : ''}{coach.vsAvg}%
-                          </span>
-                        </td>
-                        <td className={`py-4 text-right font-bold ${coach.revenueImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {coach.revenueImpact >= 0 ? '+' : ''}${coach.revenueImpact.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Insight Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-blue-500/10 border border-blue-500/30 p-5 rounded-2xl">
-                <Briefcase className="text-blue-400 mb-3" size={24} />
-                <h5 className="font-bold text-white mb-1">Why This Matters</h5>
-                <p className="text-sm text-slate-400">Coaching quality directly impacts retention. Use this data for hiring, reviews, and training decisions.</p>
-              </div>
-              <div className="bg-amber-500/10 border border-amber-500/30 p-5 rounded-2xl">
-                <Target className="text-amber-400 mb-3" size={24} />
-                <h5 className="font-bold text-white mb-1">Revenue Impact</h5>
-                <p className="text-sm text-slate-400">Shows how much each coach saves or costs compared to club average performance.</p>
-              </div>
-              <div className="bg-emerald-500/10 border border-emerald-500/30 p-5 rounded-2xl">
-                <TrendingUp className="text-emerald-400 mb-3" size={24} />
-                <h5 className="font-bold text-white mb-1">Action Items</h5>
-                <p className="text-sm text-slate-400">Coaches below average need support. Top coaches can mentor others or deserve recognition.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* ==================== DEEP DIVE TAB ==================== */}
         {activeTab === "deep-dive" && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -1506,9 +1273,9 @@ export default function WayneDashboard({ onLogout }) {
                   </div>
                 </div>
               ) : (
-                <div className="h-full min-h-[350px] flex items-center justify-center bg-[#070D1F] border border-[#3A7FC3]/30 rounded-2xl">
+                <div className="h-full min-h-[350px] flex items-center justify-center bg-[#111827] border border-slate-700/50 rounded-2xl">
                   <div className="text-center text-slate-500">
-                    <Search size={36} className="mx-auto mb-3 text-[#3A7FC3]" />
+                    <Search size={36} className="mx-auto mb-3 text-slate-600" />
                     <p>Select a Coach or Team to analyze</p>
                   </div>
                 </div>
@@ -1518,13 +1285,10 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* FOOTER */}
-        <footer className="mt-10 py-6 border-t border-[#3A7FC3]/30 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
+        <footer className="mt-10 py-6 border-t border-slate-700/50 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
+          <p>RetainPlayers • Player Retention Intelligence</p>
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="RetainPlayers" className="w-6 h-6" />
-            <p>RetainPlayers • Player Retention Intelligence</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#5DB3F5] animate-pulse"></div>
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
             <span>Live Data</span>
           </div>
         </footer>
