@@ -4,13 +4,13 @@ import {
   ComposedChart, Line, Area, Legend, PieChart, Pie, Cell,
 } from "recharts";
 import {
-  UserMinus, RefreshCcw, TrendingUp, Award, Search, ShieldCheck,
-  GraduationCap, ClipboardList, Briefcase, ChevronRight, DollarSign, X, Users, Target,
-  AlertTriangle, TrendingDown, UserPlus, UserCheck, LogOut
+  UserMinus, TrendingUp, Award, Search, ShieldCheck,
+  ClipboardList, Briefcase, ChevronRight, DollarSign, X, Users, Target,
+  AlertTriangle, TrendingDown, UserPlus, UserCheck, LogOut, Download, Info
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/* CONFIGURACIÓN: VARIABLES DE ENTORNO PARA GOOGLE SHEETS (CSV)               */
+/* CONFIGURATION                                                               */
 /* -------------------------------------------------------------------------- */
 
 const getEnvVar = (key) => {
@@ -28,35 +28,6 @@ const URLS = {
   AGE: getEnvVar("VITE_SHEET_AGE_CSV"),
   TEAMS: getEnvVar("VITE_SHEET_TEAMS_CSV"),
   PLAYERS: getEnvVar("VITE_SHEET_PLAYERS_CSV")
-};
-
-/* -------------------------------------------------------------------------- */
-/* DARK MODE COLOR PALETTE                                                    */
-/* -------------------------------------------------------------------------- */
-const COLORS = {
-  bg: {
-    primary: "#0a1628",
-    secondary: "#111827",
-    tertiary: "#1e293b",
-    card: "#111827",
-  },
-  border: {
-    primary: "rgba(51, 65, 85, 0.5)",
-    light: "rgba(71, 85, 105, 0.3)",
-  },
-  accent: {
-    blue: "#3b82f6",
-    green: "#10b981",
-    red: "#ef4444",
-    amber: "#f59e0b",
-    indigo: "#6366f1",
-    pink: "#ec4899",
-  },
-  text: {
-    primary: "#ffffff",
-    secondary: "#94a3b8",
-    muted: "#64748b",
-  }
 };
 
 /* -------------------------------------------------------------------------- */
@@ -121,13 +92,44 @@ function normalizePercent(val) {
   return n;
 }
 
+function exportToCSV(data, filename) {
+  if (!data || data.length === 0) return;
+  const headers = Object.keys(data[0]);
+  const csvContent = [
+    headers.join(','),
+    ...data.map(row => headers.map(h => {
+      const val = row[h];
+      if (typeof val === 'string' && (val.includes(',') || val.includes('"'))) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    }).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+}
+
 /* -------------------------------------------------------------------------- */
-/* COMPONENTES VISUALES - DARK MODE                                           */
+/* COMPONENTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
-// Modal para ver lista de jugadores
+// Player Modal
 const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
   if (!isOpen) return null;
+  
+  const handleExport = () => {
+    exportToCSV(players.map(p => ({
+      Name: p.name,
+      Status: p.status,
+      Team: p.team || p.teamLast || '',
+      Gender: p.gender || ''
+    })), title.replace(/[^a-zA-Z0-9]/g, '_'));
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-[#111827] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-700/50">
@@ -136,7 +138,10 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
             <h3 className="font-bold text-white text-lg">{title}</h3>
             <p className="text-xs text-slate-400">{subtitle || `${players.length} players`}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors text-slate-400 hover:text-white">
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors text-slate-400 hover:text-white"
+          >
             <X size={20} />
           </button>
         </div>
@@ -160,23 +165,40 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
                       {p.team && <span className="block text-xs text-slate-500">{p.team}</span>}
                     </div>
                   </div>
-                  {p.status && (
-                    <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
-                      p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' : 
-                      p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' :
-                      p.status === 'Retained' ? 'bg-blue-500/20 text-blue-400' :
-                      'bg-slate-700 text-slate-400'
-                    }`}>
-                      {p.status}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {p.gender && (
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        p.gender.toLowerCase() === 'boys' || p.gender.toUpperCase() === 'M' 
+                          ? 'bg-blue-500/20 text-blue-400' 
+                          : 'bg-pink-500/20 text-pink-400'
+                      }`}>
+                        {p.gender.toLowerCase() === 'boys' || p.gender.toUpperCase() === 'M' ? '♂' : '♀'}
+                      </span>
+                    )}
+                    {p.status && (
+                      <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
+                        p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' : 
+                        p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' :
+                        p.status === 'Retained' ? 'bg-blue-500/20 text-blue-400' :
+                        'bg-slate-700 text-slate-400'
+                      }`}>
+                        {p.status}
+                      </span>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </div>
-        <div className="p-4 bg-slate-800/30 text-center border-t border-slate-700/50">
-          <button onClick={onClose} className="text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white transition-colors">
+        <div className="p-4 bg-slate-800/30 border-t border-slate-700/50 flex justify-between items-center">
+          <button 
+            onClick={handleExport}
+            className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1"
+          >
+            <Download size={14} /> Export CSV
+          </button>
+          <button onClick={onClose} className="text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white">
             Close
           </button>
         </div>
@@ -185,7 +207,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
   );
 };
 
-// Scorecard principal
+// Scorecard
 const Scorecard = ({ label, value, sub, highlight, colorClass = "", onClick, clickable }) => (
   <div 
     className={`p-6 rounded-2xl flex flex-col justify-center transition-all duration-300 border ${
@@ -208,7 +230,7 @@ const Scorecard = ({ label, value, sub, highlight, colorClass = "", onClick, cli
 );
 
 // KPI Box
-const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick, clickable }) => (
+const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick, clickable, tooltip }) => (
   <div 
     className={`bg-[#111827] p-5 rounded-2xl border border-slate-700/50 flex flex-col justify-between ${
       clickable ? "cursor-pointer hover:border-blue-500/50 transition-all" : ""
@@ -219,15 +241,25 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
       <div className={`p-2.5 rounded-xl ${color} bg-opacity-20`}>
         <Icon size={20} className={color.replace('bg-', 'text-').replace('-600', '-400').replace('-500', '-400')} />
       </div>
-      {percent && (
-        <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
-          trend === "up" ? "bg-emerald-500/20 text-emerald-400" : 
-          trend === "down" ? "bg-rose-500/20 text-rose-400" : 
-          "bg-slate-700 text-slate-400"
-        }`}>
-          {percent}
-        </span>
-      )}
+      <div className="flex items-center gap-2">
+        {tooltip && (
+          <div className="group relative">
+            <Info size={14} className="text-slate-500 cursor-help" />
+            <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-slate-700 pointer-events-none">
+              {tooltip}
+            </div>
+          </div>
+        )}
+        {percent && (
+          <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
+            trend === "up" ? "bg-emerald-500/20 text-emerald-400" : 
+            trend === "down" ? "bg-rose-500/20 text-rose-400" : 
+            "bg-slate-700 text-slate-400"
+          }`}>
+            {percent}
+          </span>
+        )}
+      </div>
     </div>
     <div className="mt-4">
       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</p>
@@ -246,14 +278,7 @@ const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick,
   </div>
 );
 
-// Chart colors
-const GENDER_COLORS = {
-  boys: "#3b82f6",
-  girls: "#ec4899",
-  unknown: "#64748b"
-};
-
-// Custom Tooltip for dark mode
+// Custom Tooltip
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -261,9 +286,8 @@ const CustomTooltip = ({ active, payload, label }) => {
         <p className="text-white font-bold text-sm mb-1">{label}</p>
         {payload.map((item, idx) => (
           <p key={idx} className="text-sm" style={{ color: item.color }}>
-            {item.name}: {typeof item.value === 'number' && item.name?.includes('%') 
-              ? `${item.value}%` 
-              : item.value?.toLocaleString?.() || item.value}
+            {item.name}: {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
+            {item.name?.toLowerCase().includes('%') || item.name?.toLowerCase().includes('rate') ? '%' : ''}
           </p>
         ))}
       </div>
@@ -273,18 +297,16 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 /* -------------------------------------------------------------------------- */
-/* COMPONENTE PRINCIPAL                                                       */
+/* MAIN COMPONENT                                                              */
 /* -------------------------------------------------------------------------- */
 
 export default function WayneDashboard({ onLogout }) {
-  // Estados de navegación
   const [activeTab, setActiveTab] = useState("overview");
   const [genderFilter, setGenderFilter] = useState("club");
   const [searchTerm, setSearchTerm] = useState("");
   const [modal, setModal] = useState({ open: false, title: "", players: [], subtitle: "" });
   const [selectedEntity, setSelectedEntity] = useState({ type: 'coach', id: '' });
   
-  // Estados de datos
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -294,7 +316,7 @@ export default function WayneDashboard({ onLogout }) {
   const [teams, setTeams] = useState([]);
   const [playerList, setPlayerList] = useState([]);
 
-  // Cargar datos
+  // Load data
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -302,32 +324,37 @@ export default function WayneDashboard({ onLogout }) {
         if (!URLS.KPIS_GENDER) {
           console.log("No ENV variables found. Using Demo Data.");
           setKpisGender({
-            club: { totalLast: 601, totalThis: 545, net: -56, retained: 338, lost: 263, new: 207, fee: 3000, revenueLost: 789000, agedOut: 46 },
-            boys: { totalLast: 350, totalThis: 320, net: -30, retained: 200, lost: 150, new: 120, fee: 3000, revenueLost: 450000, agedOut: 25 },
-            girls: { totalLast: 251, totalThis: 225, net: -26, retained: 138, lost: 113, new: 87, fee: 3000, revenueLost: 339000, agedOut: 21 }
+            club: { totalLast: 601, totalThis: 545, net: -56, retained: 338, lost: 263, new: 207, fee: 3000, agedOut: 46 },
+            boys: { totalLast: 400, totalThis: 365, net: -35, retained: 230, lost: 170, new: 135, fee: 3000, agedOut: 30 },
+            girls: { totalLast: 201, totalThis: 180, net: -21, retained: 108, lost: 93, new: 72, fee: 3000, agedOut: 16 }
           });
           setPrograms([
-            { name: "Academy", retained: 120, lost: 30, retentionRate: 80 },
-            { name: "Rec League", retained: 100, lost: 80, retentionRate: 56 },
-            { name: "Travel", retained: 80, lost: 40, retentionRate: 67 },
-            { name: "Development", retained: 38, lost: 113, retentionRate: 25 }
+            { name: "MLS Next", retained: 168, lost: 119, retentionRate: 59, lastYear: 287, thisYear: 240 },
+            { name: "Academy", retained: 120, lost: 92, retentionRate: 57, lastYear: 212, thisYear: 180 },
+            { name: "NPL/Pre-NPL", retained: 45, lost: 47, retentionRate: 49, lastYear: 92, thisYear: 78 },
+            { name: "Early Dev", retained: 26, lost: 31, retentionRate: 46, lastYear: 57, thisYear: 47 }
           ]);
           setAgeDiag([
-            { year: "U6", rate: 45, eligibleRate: 52, players: 80 },
-            { year: "U8", rate: 55, eligibleRate: 62, players: 95 },
-            { year: "U10", rate: 65, eligibleRate: 70, players: 110 },
-            { year: "U12", rate: 60, eligibleRate: 68, players: 100 },
-            { year: "U14", rate: 50, eligibleRate: 58, players: 85 },
-            { year: "U16", rate: 40, eligibleRate: 48, players: 70 },
-            { year: "U18", rate: 30, eligibleRate: 35, players: 61 }
+            { year: "2012", playersLast: 75, playersThis: 68, retained: 49, rate: 72, boysLast: 45, boysThis: 40, girlsLast: 30, girlsThis: 28 },
+            { year: "2013", playersLast: 82, playersThis: 76, retained: 56, rate: 74, boysLast: 50, boysThis: 46, girlsLast: 32, girlsThis: 30 },
+            { year: "2014", playersLast: 70, playersThis: 63, retained: 49, rate: 78, boysLast: 42, boysThis: 38, girlsLast: 28, girlsThis: 25 },
+            { year: "2015", playersLast: 40, playersThis: 35, retained: 25, rate: 71, boysLast: 24, boysThis: 21, girlsLast: 16, girlsThis: 14 },
+            { year: "2016", playersLast: 42, playersThis: 37, retained: 20, rate: 54, boysLast: 25, boysThis: 22, girlsLast: 17, girlsThis: 15 },
+            { year: "2017", playersLast: 32, playersThis: 28, retained: 12, rate: 43, boysLast: 19, boysThis: 17, girlsLast: 13, girlsThis: 11 },
           ]);
           setTeams([
-            { name: "U10 Boys Red", program: "Travel", coach: "John Smith", lastYear: 15, retained: 12, lost: 3, gender: "boys", fee: 3500 },
-            { name: "U12 Girls Blue", program: "Travel", coach: "Sarah Jones", lastYear: 14, retained: 10, lost: 4, gender: "girls", fee: 3500 },
+            { name: "2012 MLS", program: "MLS Next", coach: "Coach A", lastYear: 16, retained: 12, lost: 4, gender: "boys", fee: 3500 },
+            { name: "2012 Girls Academy", program: "Academy", coach: "Coach B", lastYear: 14, retained: 9, lost: 5, gender: "girls", fee: 2800 },
+            { name: "2013 MLS", program: "MLS Next", coach: "Coach C", lastYear: 15, retained: 11, lost: 4, gender: "boys", fee: 3500 },
+            { name: "2013 Girls MLS", program: "MLS Next", coach: "Coach D", lastYear: 12, retained: 8, lost: 4, gender: "girls", fee: 3500 },
           ]);
           setPlayerList([
-            { name: "Alex Johnson", status: "Retained", teamLast: "U10 Boys Red", teamThis: "U12 Boys Red", gender: "M" },
-            { name: "Emma Wilson", status: "Lost", teamLast: "U10 Girls White", teamThis: "", gender: "F" },
+            { name: "Alex Johnson", status: "Retained", teamLast: "2012 MLS", teamThis: "2012 MLS", gender: "Boys", agedOut: false },
+            { name: "Emma Wilson", status: "Lost", teamLast: "2013 Girls MLS", teamThis: "", gender: "Girls", agedOut: false },
+            { name: "Mike Smith", status: "Lost", teamLast: "2006 MLS", teamThis: "", gender: "Boys", agedOut: true },
+            { name: "Sarah Davis", status: "New", teamLast: "", teamThis: "2014 Academy", gender: "Girls", agedOut: false },
+            { name: "John Doe", status: "Retained", teamLast: "2012 MLS", teamThis: "2012 MLS", gender: "Boys", agedOut: false },
+            { name: "Jane Smith", status: "Lost", teamLast: "2012 Girls Academy", teamThis: "", gender: "Girls", agedOut: false },
           ]);
           setLoading(false);
           return;
@@ -343,7 +370,7 @@ export default function WayneDashboard({ onLogout }) {
 
         const [kpiText, progText, ageText, teamText, playerText] = responses;
 
-        // 1. KPIs por Género
+        // KPIs by Gender
         const kpiRows = rowsToObjects(parseCSV(kpiText));
         const kpiMap = {};
         kpiRows.forEach(r => {
@@ -351,18 +378,17 @@ export default function WayneDashboard({ onLogout }) {
           kpiMap[key] = {
             totalLast: toNumber(pick(r, ["Total 24/25", "totalLastYear"])),
             totalThis: toNumber(pick(r, ["Total 25/26", "totalThisYear"])),
-            net: toNumber(pick(r, ["Net Change", "netChange", "Churn"])),
+            net: toNumber(pick(r, ["Net Change", "netChange"])),
             retained: toNumber(pick(r, ["Retained", "retained"])),
             lost: toNumber(pick(r, ["Lost", "lost"])),
             new: toNumber(pick(r, ["New", "new"])),
             fee: toNumber(pick(r, ["Avg Fee", "avgFee"])) || 3000,
-            revenueLost: toNumber(pick(r, ["Revenue Lost", "revenueLost"])),
             agedOut: toNumber(pick(r, ["Aged Out", "agedOut"])) || 0
           };
         });
         setKpisGender(kpiMap);
 
-        // 2. Programs
+        // Programs
         const progRows = rowsToObjects(parseCSV(progText));
         setPrograms(progRows.map(r => {
           const retained = toNumber(pick(r, ["retained", "Retained"]));
@@ -372,55 +398,84 @@ export default function WayneDashboard({ onLogout }) {
             name: pick(r, ["name", "Name"]),
             retained,
             lost,
-            retentionRate: total > 0 ? Math.round((retained / total) * 100) : 0
+            retentionRate: total > 0 ? Math.round((retained / total) * 100) : 0,
+            lastYear: toNumber(pick(r, ["lastYear", "Last Year"])) || total,
+            thisYear: toNumber(pick(r, ["thisYear", "This Year"])) || retained
           };
         }));
 
-        // 3. Age Diagnostic
+        // Age Diagnostic
         const ageRows = rowsToObjects(parseCSV(ageText));
         setAgeDiag(ageRows.map(r => ({
           year: pick(r, ["year", "Year"]),
           rate: normalizePercent(pick(r, ["rate", "Rate"])),
-          eligibleRate: normalizePercent(pick(r, ["eligibleRate", "EligibleRate"])),
-          players: toNumber(pick(r, ["players", "Players"]))
-        })));
-
-        // 4. Teams
-        const teamRows = rowsToObjects(parseCSV(teamText));
-        setTeams(teamRows.map(r => ({
-          name: pick(r, ["name", "Team", "Team (Last Yr)"]),
-          program: pick(r, ["program", "Program"]),
-          coach: pick(r, ["coach", "Coach"]) || "Unassigned",
-          lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])),
+          playersLast: toNumber(pick(r, ["playersLast", "Players Last"])) || toNumber(pick(r, ["players", "Players"])),
+          playersThis: toNumber(pick(r, ["playersThis", "Players This"])) || toNumber(pick(r, ["players", "Players"])),
           retained: toNumber(pick(r, ["retained", "Retained"])),
-          lost: toNumber(pick(r, ["lost", "Lost"])),
-          gender: (pick(r, ["name", "Team"]) || "").toLowerCase().includes("girls") ? "girls" : "boys",
-          fee: toNumber(pick(r, ["Fee", "fee", "Cost", "cost", "Price"])) || 3000
+          boysLast: toNumber(pick(r, ["boysLast", "Boys Last"])),
+          boysThis: toNumber(pick(r, ["boysThis", "Boys This"])),
+          girlsLast: toNumber(pick(r, ["girlsLast", "Girls Last"])),
+          girlsThis: toNumber(pick(r, ["girlsThis", "Girls This"]))
         })));
 
-        // 5. Players Master
+        // Teams
+        const teamRows = rowsToObjects(parseCSV(teamText));
+        setTeams(teamRows.map(r => {
+          const name = pick(r, ["name", "Team", "Team (Last Yr)"]) || "";
+          return {
+            name,
+            program: pick(r, ["program", "Program"]),
+            coach: pick(r, ["coach", "Coach"]) || "Unassigned",
+            lastYear: toNumber(pick(r, ["count", "Players Last Yr", "lastYear"])),
+            retained: toNumber(pick(r, ["retained", "Retained"])),
+            lost: toNumber(pick(r, ["lost", "Lost"])),
+            gender: pick(r, ["gender", "Gender"]) || (name.toLowerCase().includes("girl") ? "girls" : "boys"),
+            fee: toNumber(pick(r, ["Fee", "fee"])) || 3000
+          };
+        }));
+
+        // Players
         const playerRows = rowsToObjects(parseCSV(playerText));
         setPlayerList(playerRows.map(r => {
-          const regLast = pick(r, ["Registered Last Yr (Y/N)", "Registered Last Yr"]);
-          const regThis = pick(r, ["Registered This Yr (Y/N)", "Registered This Yr"]);
+          const regLast = pick(r, ["Registered Last Yr (Y/N)", "Registered Last Yr", "in_24_25"]);
+          const regThis = pick(r, ["Registered This Yr (Y/N)", "Registered This Yr", "in_25_26"]);
+          const teamLast = pick(r, ["Team (Last Yr)", "team_last"]);
+          const ageGroupLast = pick(r, ["Age Group (Last Yr)", "age_group_last"]);
+          
           let status = "Unknown";
           if (regLast === 'Y' && regThis === 'Y') status = "Retained";
           else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
           else if (regLast !== 'Y' && regThis === 'Y') status = "New";
 
+          const isAgedOut = 
+            teamLast?.includes('06/07') || 
+            teamLast?.includes('2006') || 
+            teamLast?.includes('2005') ||
+            ageGroupLast?.includes('U19') ||
+            ageGroupLast?.includes('2006') ||
+            ageGroupLast?.includes('2005');
+
+          let gender = pick(r, ["gender", "Gender"]) || "";
+          if (!gender) {
+            const team = teamLast || pick(r, ["Team (This Yr)", "team_this"]) || "";
+            gender = team.toLowerCase().includes('girl') ? "Girls" : "Boys";
+          }
+          if (gender.toUpperCase() === 'M' || gender.toLowerCase() === 'male') gender = "Boys";
+          if (gender.toUpperCase() === 'F' || gender.toLowerCase() === 'female') gender = "Girls";
+
           return {
             name: `${pick(r, ["first_name", "First Name"])} ${pick(r, ["last_name", "Last Name"])}`.trim(),
             status,
-            teamLast: pick(r, ["Team (Last Yr)", "team_last"]),
+            teamLast,
             teamThis: pick(r, ["Team (This Yr)", "team_this"]),
-            gender: pick(r, ["gender", "Gender"]),
-            coach: pick(r, ["coach", "Coach"])
+            gender,
+            agedOut: isAgedOut
           };
         }));
 
       } catch (e) {
         console.error("Fetch Error:", e);
-        setErr("Failed to load data. Check your Google Sheets URLs.");
+        setErr("Failed to load data.");
       } finally {
         setLoading(false);
       }
@@ -428,24 +483,27 @@ export default function WayneDashboard({ onLogout }) {
     loadData();
   }, []);
 
-  // Datos activos según filtro
+  // Active data based on filter
   const activeData = kpisGender?.[genderFilter] ?? {
-    totalLast: 0, totalThis: 0, net: 0, retained: 0, lost: 0, new: 0, fee: 3000, revenueLost: 0, agedOut: 0
+    totalLast: 0, totalThis: 0, net: 0, retained: 0, lost: 0, new: 0, fee: 3000, agedOut: 0
   };
 
-  // Calcular porcentajes
+  // Calculate metrics
+  const agedOut = activeData.agedOut || 0;
+  const lostExcludingAgedOut = Math.max(0, activeData.lost - agedOut);
+  
   const retentionPercent = activeData.totalLast > 0 
-    ? Math.round((activeData.retained / activeData.totalLast) * 100) 
-    : 0;
+    ? Math.round((activeData.retained / activeData.totalLast) * 100) : 0;
   
   const churnPercent = activeData.totalLast > 0 
-    ? Math.round((activeData.lost / activeData.totalLast) * 100) 
-    : 0;
+    ? Math.round((lostExcludingAgedOut / activeData.totalLast) * 100) : 0;
 
-  const eligibleBase = activeData.totalLast - (activeData.agedOut || 0);
+  const eligibleBase = activeData.totalLast - agedOut;
   const eligibleRetentionPercent = eligibleBase > 0 
-    ? Math.round((activeData.retained / eligibleBase) * 100) 
-    : 0;
+    ? Math.round((activeData.retained / eligibleBase) * 100) : 0;
+
+  const changePercent = activeData.totalLast > 0
+    ? Math.round(((activeData.totalThis - activeData.totalLast) / activeData.totalLast) * 100) : 0;
 
   // Revenue
   const exactRevenueLost = useMemo(() => {
@@ -457,35 +515,54 @@ export default function WayneDashboard({ onLogout }) {
     return relevantTeams.reduce((total, team) => total + (team.lost * team.fee), 0);
   }, [teams, genderFilter]);
 
-  const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (activeData.lost * activeData.fee);
+  const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (lostExcludingAgedOut * activeData.fee);
   const potentialRecovery = Math.round(displayRevenueLost * 0.3);
 
-  // Filtrar equipos
+  // Filter teams
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return teams.filter((t) => {
       const matchesSearch = (t.name || "").toLowerCase().includes(q) || (t.coach || "").toLowerCase().includes(q);
-      const matchesGender = genderFilter === "club" || (t.gender && t.gender.toLowerCase() === genderFilter);
+      const matchesGender = genderFilter === "club" || t.gender === genderFilter;
       return matchesSearch && matchesGender;
     });
   }, [teams, searchTerm, genderFilter]);
 
-  // Pie chart data
-  const genderPieData = useMemo(() => {
-    if (!kpisGender) return [];
-    const boys = kpisGender.boys?.totalThis || 0;
-    const girls = kpisGender.girls?.totalThis || 0;
-    return [
-      { name: "Boys", value: boys, color: GENDER_COLORS.boys },
-      { name: "Girls", value: girls, color: GENDER_COLORS.girls }
-    ];
-  }, [kpisGender]);
-
+  // Gender comparison data
   const genderComparisonData = useMemo(() => {
     if (!kpisGender) return [];
     return [
-      { name: "Boys", lastYear: kpisGender.boys?.totalLast || 0, thisYear: kpisGender.boys?.totalThis || 0 },
-      { name: "Girls", lastYear: kpisGender.girls?.totalLast || 0, thisYear: kpisGender.girls?.totalThis || 0 }
+      { 
+        name: "Boys", 
+        lastYear: kpisGender.boys?.totalLast || 0, 
+        thisYear: kpisGender.boys?.totalThis || 0,
+        change: kpisGender.boys && kpisGender.boys.totalLast > 0 
+          ? Math.round(((kpisGender.boys.totalThis - kpisGender.boys.totalLast) / kpisGender.boys.totalLast) * 100) : 0
+      },
+      { 
+        name: "Girls", 
+        lastYear: kpisGender.girls?.totalLast || 0, 
+        thisYear: kpisGender.girls?.totalThis || 0,
+        change: kpisGender.girls && kpisGender.girls.totalLast > 0 
+          ? Math.round(((kpisGender.girls.totalThis - kpisGender.girls.totalLast) / kpisGender.girls.totalLast) * 100) : 0
+      }
+    ];
+  }, [kpisGender]);
+
+  // Age comparison data
+  const ageComparisonData = useMemo(() => {
+    return ageDiag.map(a => ({
+      ...a,
+      change: a.playersLast > 0 ? Math.round(((a.playersThis - a.playersLast) / a.playersLast) * 100) : 0
+    }));
+  }, [ageDiag]);
+
+  // Pie chart data
+  const genderPieData = useMemo(() => {
+    if (!kpisGender) return [];
+    return [
+      { name: "Boys", value: kpisGender.boys?.totalThis || 0, color: "#3b82f6" },
+      { name: "Girls", value: kpisGender.girls?.totalThis || 0, color: "#ec4899" }
     ];
   }, [kpisGender]);
 
@@ -493,40 +570,32 @@ export default function WayneDashboard({ onLogout }) {
   const deepDiveStats = useMemo(() => {
     if (!selectedEntity.id) return null;
     
-    if (selectedEntity.type === 'coach') {
-      const coachTeams = teams.filter(t => t.coach === selectedEntity.id);
-      if (coachTeams.length === 0) return null;
-      const totalLost = coachTeams.reduce((acc, curr) => acc + curr.lost, 0);
-      const totalRet = coachTeams.reduce((acc, curr) => acc + curr.retained, 0);
-      const totalLast = coachTeams.reduce((acc, curr) => acc + curr.lastYear, 0);
-      const lostRevenue = coachTeams.reduce((acc, curr) => acc + (curr.lost * curr.fee), 0);
-      return {
-        name: selectedEntity.id,
-        teams: coachTeams,
-        retentionRate: totalLast > 0 ? Math.round((totalRet / totalLast) * 100) : 0,
-        totalRetained: totalRet,
-        totalLost,
-        totalPlayers: totalLast,
-        lostRevenue
-      };
-    } else {
-      const team = teams.find(t => t.name === selectedEntity.id);
-      return team ? {
-        name: team.name,
-        teams: [team],
-        retentionRate: team.lastYear > 0 ? Math.round((team.retained / team.lastYear) * 100) : 0,
-        totalRetained: team.retained,
-        totalLost: team.lost,
-        totalPlayers: team.lastYear,
-        lostRevenue: team.lost * team.fee
-      } : null;
-    }
+    const relevantTeams = selectedEntity.type === 'coach' 
+      ? teams.filter(t => t.coach === selectedEntity.id)
+      : teams.filter(t => t.name === selectedEntity.id);
+    
+    if (relevantTeams.length === 0) return null;
+
+    const totalLost = relevantTeams.reduce((acc, curr) => acc + curr.lost, 0);
+    const totalRet = relevantTeams.reduce((acc, curr) => acc + curr.retained, 0);
+    const totalLast = relevantTeams.reduce((acc, curr) => acc + curr.lastYear, 0);
+    const lostRevenue = relevantTeams.reduce((acc, curr) => acc + (curr.lost * curr.fee), 0);
+    
+    return {
+      name: selectedEntity.id,
+      teams: relevantTeams,
+      retentionRate: totalLast > 0 ? Math.round((totalRet / totalLast) * 100) : 0,
+      totalRetained: totalRet,
+      totalLost,
+      totalPlayers: totalLast,
+      lostRevenue
+    };
   }, [selectedEntity, teams]);
 
   const uniqueCoaches = useMemo(() => [...new Set(teams.map(t => t.coach).filter(c => c && c !== "Unassigned"))].sort(), [teams]);
   const uniqueTeams = useMemo(() => [...new Set(teams.map(t => t.name))].sort(), [teams]);
 
-  // Modal handler
+  // Open player modal - FIXED gender filter
   const handleOpenPlayerList = (filter, title) => {
     let matchedPlayers = [];
     
@@ -535,32 +604,49 @@ export default function WayneDashboard({ onLogout }) {
     } else if (filter.team && filter.status) {
       matchedPlayers = playerList.filter(p => {
         const teamMatch = p.teamLast === filter.team || p.teamThis === filter.team;
-        const statusMatch = p.status === filter.status;
-        return teamMatch && statusMatch;
+        return teamMatch && p.status === filter.status;
       });
     } else if (filter.status) {
       matchedPlayers = playerList.filter(p => p.status === filter.status);
     }
 
+    // Exclude aged out if "Lost"
+    if (filter === 'Lost' || filter.status === 'Lost') {
+      matchedPlayers = matchedPlayers.filter(p => !p.agedOut);
+    }
+
+    // FIXED: Filter by gender correctly
     if (genderFilter !== 'club') {
-      const genderCode = genderFilter === 'boys' ? 'M' : 'F';
-      matchedPlayers = matchedPlayers.filter(p => 
-        p.gender?.toUpperCase() === genderCode || 
-        p.gender?.toLowerCase() === genderFilter ||
-        p.gender?.toLowerCase() === 'boys' ||
-        p.gender?.toLowerCase() === 'girls'
-      );
+      matchedPlayers = matchedPlayers.filter(p => {
+        const playerGender = (p.gender || "").toLowerCase();
+        return playerGender === genderFilter || 
+               (genderFilter === 'boys' && (playerGender === 'boys' || playerGender === 'm' || playerGender === 'male')) ||
+               (genderFilter === 'girls' && (playerGender === 'girls' || playerGender === 'f' || playerGender === 'female'));
+      });
     }
 
     setModal({
       open: true,
       title,
       players: matchedPlayers.map(p => ({ ...p, team: p.teamLast || p.teamThis })),
-      subtitle: `${genderFilter !== 'club' ? genderFilter.charAt(0).toUpperCase() + genderFilter.slice(1) + ' - ' : ''}${matchedPlayers.length} players`
+      subtitle: `${genderFilter !== 'club' ? genderFilter.charAt(0).toUpperCase() + genderFilter.slice(1) + ' only - ' : ''}${matchedPlayers.length} players`
     });
   };
 
-  // Logout handler
+  // Export all
+  const handleExportAll = () => {
+    const allData = playerList.map(p => ({
+      Name: p.name,
+      Status: p.status,
+      Gender: p.gender,
+      'Team Last Year': p.teamLast,
+      'Team This Year': p.teamThis,
+      'Aged Out': p.agedOut ? 'Yes' : 'No'
+    }));
+    exportToCSV(allData, 'RetainPlayers_Full_Export');
+  };
+
+  // Logout
   const handleLogout = () => {
     localStorage.removeItem("rp_authenticated");
     localStorage.removeItem("rp_auth_time");
@@ -569,7 +655,6 @@ export default function WayneDashboard({ onLogout }) {
 
   return (
     <div className="min-h-screen bg-[#0a1628] p-4 md:p-6 font-sans text-white">
-      {/* Modal */}
       <PlayerModal 
         isOpen={modal.open} 
         onClose={() => setModal({ ...modal, open: false })} 
@@ -596,14 +681,17 @@ export default function WayneDashboard({ onLogout }) {
           </div>
 
           <div className="flex flex-col items-end gap-3">
-            {/* Logout button */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
-            >
-              <LogOut size={14} />
-              Logout
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleExportAll}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
+              >
+                <Download size={14} /> Export
+              </button>
+              <button onClick={handleLogout} className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors">
+                <LogOut size={14} /> Logout
+              </button>
+            </div>
 
             {/* Gender Filter */}
             <div className="flex bg-[#111827] p-1 rounded-xl border border-slate-700/50">
@@ -656,7 +744,7 @@ export default function WayneDashboard({ onLogout }) {
         {loading && (
           <div className="bg-[#111827] p-6 rounded-2xl text-center border border-slate-700/50 mb-6">
             <div className="w-8 h-8 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-slate-400 font-medium">Loading data from Google Sheets...</p>
+            <p className="text-slate-400 font-medium">Loading data...</p>
           </div>
         )}
         {err && (
@@ -672,34 +760,60 @@ export default function WayneDashboard({ onLogout }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
               <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" />
-              <Scorecard label="Net Change" value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} sub={`${churnPercent}% churn rate`} highlight />
+              <Scorecard 
+                label="Net Change" 
+                value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} 
+                sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`} 
+                highlight 
+              />
             </div>
 
             {/* KPI Boxes */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <KPIBox 
-                title="Retained" value={activeData.retained.toLocaleString()} sub="Stayed from last season"
-                percent={`${retentionPercent}%`} icon={UserCheck} color="bg-blue-600" trend="up"
-                clickable onClick={() => handleOpenPlayerList({ status: 'Retained' }, 'Retained Players')}
+                title="Retained" 
+                value={activeData.retained.toLocaleString()} 
+                sub="Stayed from last season"
+                percent={`${retentionPercent}%`} 
+                icon={UserCheck} 
+                color="bg-blue-600" 
+                trend="up"
+                clickable 
+                onClick={() => handleOpenPlayerList({ status: 'Retained' }, 'Retained Players')}
               />
               <KPIBox 
-                title="Lost (Churn)" value={activeData.lost.toLocaleString()} sub="Did not return"
-                percent={`${churnPercent}%`} icon={UserMinus} color="bg-rose-500" trend="down"
-                clickable onClick={() => handleOpenPlayerList({ status: 'Lost' }, 'Lost Players')}
+                title="Lost (Churn)" 
+                value={lostExcludingAgedOut.toLocaleString()} 
+                sub="Did not return (excl. aged out)"
+                percent={`${churnPercent}%`} 
+                icon={UserMinus} 
+                color="bg-rose-500" 
+                trend="down"
+                tooltip="Excludes players who naturally graduated (U19)"
+                clickable 
+                onClick={() => handleOpenPlayerList({ status: 'Lost' }, 'Lost Players (excl. aged out)')}
               />
               <KPIBox 
-                title="New Players" value={activeData.new.toLocaleString()} sub="First time this season"
-                icon={UserPlus} color="bg-emerald-600" trend="up"
-                clickable onClick={() => handleOpenPlayerList({ status: 'New' }, 'New Players')}
+                title="New Players" 
+                value={activeData.new.toLocaleString()} 
+                sub="First time this season"
+                icon={UserPlus} 
+                color="bg-emerald-600" 
+                trend="up"
+                clickable 
+                onClick={() => handleOpenPlayerList({ status: 'New' }, 'New Players')}
               />
               <KPIBox 
-                title="Eligible Retention" value={`${eligibleRetentionPercent}%`} 
-                sub={`Excl. ${activeData.agedOut || 0} aged out`}
-                icon={Target} color="bg-indigo-600"
+                title="Eligible Retention" 
+                value={`${eligibleRetentionPercent}%`} 
+                sub={`Retained ÷ (${activeData.totalLast} - ${agedOut} aged out)`}
+                icon={Target} 
+                color="bg-indigo-600"
+                tooltip="Retention rate excluding players who aged out"
               />
             </div>
 
-            {/* Charts */}
+            {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
               {/* Retention by Program */}
               <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50 lg:col-span-2">
@@ -758,6 +872,9 @@ export default function WayneDashboard({ onLogout }) {
                         <span className={`font-bold ${g.thisYear >= g.lastYear ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {g.thisYear}
                         </span>
+                        <span className={`text-xs ${g.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          ({g.change >= 0 ? '+' : ''}{g.change}%)
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -786,39 +903,52 @@ export default function WayneDashboard({ onLogout }) {
           <div className="space-y-6">
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2">Retention by Age Group</h4>
-              <p className="text-slate-400 text-sm mb-6">Identify which birth years have the highest churn risk</p>
+              <p className="text-slate-400 text-sm mb-6">Compare player counts year over year by birth year</p>
               <div className="h-[380px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={ageDiag}>
+                  <ComposedChart data={ageComparisonData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                     <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                    <Area yAxisId="left" type="monotone" dataKey="eligibleRate" name="Eligible %" fill="#3b82f6" fillOpacity={0.2} stroke="#3b82f6" strokeWidth={2} />
-                    <Line yAxisId="left" type="monotone" dataKey="rate" name="Gross %" stroke="#64748b" strokeDasharray="5 5" strokeWidth={2} dot={{ r: 4 }} />
-                    <Bar yAxisId="right" dataKey="players" name="Players" fill="#475569" barSize={16} radius={[4, 4, 0, 0]} opacity={0.5} />
+                    <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+
+            {/* Year change cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {ageComparisonData.slice(0, 6).map((a, idx) => (
+                <div key={idx} className="bg-[#111827] rounded-xl p-4 text-center border border-slate-700/50">
+                  <p className="text-white font-bold text-lg">{a.year}</p>
+                  <p className="text-slate-400 text-sm">{a.playersLast} → {a.playersThis}</p>
+                  <p className={`text-lg font-bold ${a.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {a.change >= 0 ? '+' : ''}{a.change}%
+                  </p>
+                </div>
+              ))}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 border border-rose-500/30 p-5 rounded-2xl">
                 <TrendingDown className="text-rose-400 mb-3" size={24} />
                 <h5 className="font-bold text-white mb-1">Highest Risk</h5>
-                <p className="text-sm text-slate-400">Older birth years (2006-2007) show lowest retention</p>
+                <p className="text-sm text-slate-400">Older birth years (2006-2007) aging out</p>
               </div>
               <div className="bg-amber-500/10 border border-amber-500/30 p-5 rounded-2xl">
                 <AlertTriangle className="text-amber-400 mb-3" size={24} />
-                <h5 className="font-bold text-white mb-1">Transition Points</h5>
-                <p className="text-sm text-slate-400">Watch for drop-off in 2016-2017 birth years</p>
+                <h5 className="font-bold text-white mb-1">Watch List</h5>
+                <p className="text-sm text-slate-400">2016-2017 showing lower retention</p>
               </div>
               <div className="bg-emerald-500/10 border border-emerald-500/30 p-5 rounded-2xl">
                 <TrendingUp className="text-emerald-400 mb-3" size={24} />
                 <h5 className="font-bold text-white mb-1">Strongest Cohort</h5>
-                <p className="text-sm text-slate-400">2012-2014 birth years maintain 70%+ retention</p>
+                <p className="text-sm text-slate-400">2012-2014 maintain 70%+ retention</p>
               </div>
             </div>
           </div>
@@ -836,7 +966,7 @@ export default function WayneDashboard({ onLogout }) {
                   <div>
                     <p className="text-rose-200 text-xs font-bold uppercase tracking-wider mb-1">Revenue Lost to Churn</p>
                     <h3 className="text-5xl font-black text-white">${displayRevenueLost.toLocaleString()}</h3>
-                    <p className="text-rose-200 text-sm mt-1">{activeData.lost} players × ${activeData.fee.toLocaleString()} avg fee</p>
+                    <p className="text-rose-200 text-sm mt-1">{lostExcludingAgedOut} players × ${activeData.fee.toLocaleString()} avg fee</p>
                   </div>
                 </div>
               </div>
@@ -853,7 +983,7 @@ export default function WayneDashboard({ onLogout }) {
                     <p className="text-2xl font-black text-rose-400">-${displayRevenueLost.toLocaleString()}</p>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500">From {activeData.lost} players who didn't return</p>
+                <p className="text-sm text-slate-500">From {lostExcludingAgedOut} players who didn't return</p>
               </div>
 
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
@@ -895,7 +1025,7 @@ export default function WayneDashboard({ onLogout }) {
                 <div className="bg-white/10 px-5 py-4 rounded-xl border border-white/20">
                   <p className="text-xs font-bold text-emerald-200 uppercase mb-2">Action Items</p>
                   <ul className="text-sm text-white space-y-1">
-                    <li>• Contact {Math.round(activeData.lost * 0.3)} high-value players</li>
+                    <li>• Contact {Math.round(lostExcludingAgedOut * 0.3)} high-value players</li>
                     <li>• Offer early-bird discount</li>
                     <li>• Survey for churn reasons</li>
                   </ul>
@@ -904,7 +1034,21 @@ export default function WayneDashboard({ onLogout }) {
             </div>
 
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
-              <h4 className="text-lg font-bold text-white mb-4">Top Revenue Losses by Team</h4>
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-bold text-white">Top Revenue Losses by Team</h4>
+                <button 
+                  onClick={() => exportToCSV(filteredTeams.map(t => ({
+                    Team: t.name,
+                    Program: t.program,
+                    Lost: t.lost,
+                    Fee: t.fee,
+                    'Revenue Lost': t.lost * t.fee
+                  })), 'Revenue_Losses')}
+                  className="text-xs text-blue-400 flex items-center gap-1 hover:text-blue-300"
+                >
+                  <Download size={14} /> Export
+                </button>
+              </div>
               <div className="space-y-3">
                 {filteredTeams
                   .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
@@ -923,7 +1067,7 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* ==================== FULL ROSTER TAB ==================== */}
+        {/* ==================== TEAMS TAB ==================== */}
         {activeTab === "full-roster" && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -931,15 +1075,23 @@ export default function WayneDashboard({ onLogout }) {
                 <h4 className="text-xl font-bold text-white">Team Roster</h4>
                 <p className="text-slate-400 text-sm">Click on numbers to see player lists</p>
               </div>
-              <div className="relative w-full md:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search team or coach..."
-                  className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl py-2.5 pl-10 pr-4 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+              <div className="flex items-center gap-3">
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search team or coach..."
+                    className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl py-2.5 pl-10 pr-4 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <button 
+                  onClick={() => exportToCSV(filteredTeams, 'Teams_Export')}
+                  className="p-2.5 bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
+                >
+                  <Download size={18} />
+                </button>
               </div>
             </div>
             
