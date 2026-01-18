@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/* BRAND COLORS - RetainPlayers                                               */
+/* BRAND COLORS - RetainPlayers                                                */
+/* Add to index.html: <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet"> */
 /* -------------------------------------------------------------------------- */
 const BRAND = {
   primary: '#5DB3F5',      // Light blue - main accent
@@ -24,7 +25,7 @@ const BRAND = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* CONFIGURATION                                                              */
+/* CONFIGURATION                                                               */
 /* -------------------------------------------------------------------------- */
 
 const getEnvVar = (key) => {
@@ -45,7 +46,7 @@ const URLS = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
+/* HELPERS                                                                     */
 /* -------------------------------------------------------------------------- */
 
 function parseCSV(text) {
@@ -128,7 +129,7 @@ function exportToCSV(data, filename) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* COMPONENTS                                                                 */
+/* COMPONENTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
 // Player Modal
@@ -311,7 +312,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 /* -------------------------------------------------------------------------- */
-/* MAIN COMPONENT                                                             */
+/* MAIN COMPONENT                                                              */
 /* -------------------------------------------------------------------------- */
 
 export default function WayneDashboard({ onLogout }) {
@@ -454,20 +455,23 @@ export default function WayneDashboard({ onLogout }) {
           const regLast = pick(r, ["Registered Last Yr (Y/N)", "Registered Last Yr", "in_24_25"]);
           const regThis = pick(r, ["Registered This Yr (Y/N)", "Registered This Yr", "in_25_26"]);
           const teamLast = pick(r, ["Team (Last Yr)", "team_last"]);
-          const ageGroupLast = pick(r, ["Age Group (Last Yr)", "age_group_last"]);
           
-          let status = "Unknown";
-          if (regLast === 'Y' && regThis === 'Y') status = "Retained";
-          else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
-          else if (regLast !== 'Y' && regThis === 'Y') status = "New";
+          // Use status from PlayerMaster if available, otherwise calculate
+          let status = pick(r, ["status", "Status"]) || "Unknown";
+          if (status === "Unknown" || !status) {
+            if (regLast === 'Y' && regThis === 'Y') status = "Retained";
+            else if (regLast === 'Y' && regThis !== 'Y') status = "Lost";
+            else if (regLast !== 'Y' && regThis === 'Y') status = "New";
+          }
 
+          // Use aged_out from PlayerMaster column (based on birth year, not team name)
+          const agedOutValue = pick(r, ["aged_out", "Aged Out", "agedOut"]);
           const isAgedOut = 
-            teamLast?.includes('06/07') || 
-            teamLast?.includes('2006') || 
-            teamLast?.includes('2005') ||
-            ageGroupLast?.includes('U19') ||
-            ageGroupLast?.includes('2006') ||
-            ageGroupLast?.includes('2005');
+            agedOutValue === 'Y' || 
+            agedOutValue === 'Yes' || 
+            agedOutValue === 'y' ||
+            agedOutValue === true ||
+            agedOutValue === 'TRUE';
 
           let gender = pick(r, ["gender", "Gender"]) || "";
           if (!gender) {
@@ -669,21 +673,15 @@ export default function WayneDashboard({ onLogout }) {
     return { coaches, clubAvgRate, bestCoach, worstCoach, totalRevenueDelta };
   }, [teams, activeData.fee]);
 
-  // Open player modal - FIXED: EXTRA PERMISSIVE MATCHING
+  // Open player modal - FIXED gender filter
   const handleOpenPlayerList = (filter, title) => {
     let matchedPlayers = [];
     
     if (typeof filter === 'string') {
       matchedPlayers = playerList.filter(p => p.status === filter);
     } else if (filter.team && filter.status) {
-      // CORRECCIÓN: Normalizamos a minúsculas y quitamos espacios para comparar
-      const targetTeam = (filter.team || "").toLowerCase().trim();
-
       matchedPlayers = playerList.filter(p => {
-        const pTeamLast = (p.teamLast || "").toLowerCase().trim();
-        const pTeamThis = (p.teamThis || "").toLowerCase().trim();
-        
-        const teamMatch = pTeamLast === targetTeam || pTeamThis === targetTeam;
+        const teamMatch = p.teamLast === filter.team || p.teamThis === filter.team;
         return teamMatch && p.status === filter.status;
       });
     } else if (filter.status) {
@@ -695,7 +693,7 @@ export default function WayneDashboard({ onLogout }) {
       matchedPlayers = matchedPlayers.filter(p => !p.agedOut);
     }
 
-    // Filter by gender correctly
+    // FIXED: Filter by gender correctly
     if (genderFilter !== 'club') {
       matchedPlayers = matchedPlayers.filter(p => {
         const playerGender = (p.gender || "").toLowerCase();
@@ -1511,9 +1509,9 @@ export default function WayneDashboard({ onLogout }) {
                   </div>
                 </div>
               ) : (
-                <div className="h-full min-h-[350px] flex items-center justify-center bg-[#111827] border border-slate-700/50 rounded-2xl">
+                <div className="h-full min-h-[350px] flex items-center justify-center bg-[#070D1F] border border-[#3A7FC3]/30 rounded-2xl">
                   <div className="text-center text-slate-500">
-                    <Search size={36} className="mx-auto mb-3 text-slate-600" />
+                    <Search size={36} className="mx-auto mb-3 text-[#3A7FC3]" />
                     <p>Select a Coach or Team to analyze</p>
                   </div>
                 </div>
@@ -1523,13 +1521,13 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* FOOTER */}
-        <footer className="mt-10 py-6 border-t border-slate-700/50 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
+        <footer className="mt-10 py-6 border-t border-[#3A7FC3]/30 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="RetainPlayers" className="w-6 h-6" />
             <p>RetainPlayers • Player Retention Intelligence</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+            <div className="w-2 h-2 rounded-full bg-[#5DB3F5] animate-pulse"></div>
             <span>Live Data</span>
           </div>
         </footer>
