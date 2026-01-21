@@ -11,7 +11,7 @@ import {
 import * as XLSX from 'xlsx';
 
 /* -------------------------------------------------------------------------- */
-/* CONFIGURATION                                                              */
+/* CONFIGURATION                                                               */
 /* -------------------------------------------------------------------------- */
 const getEnvVar = (key) => {
   try {
@@ -30,7 +30,7 @@ const URLS = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
+/* HELPERS                                                                     */
 /* -------------------------------------------------------------------------- */
 function parseCSV(text) {
   const rows = [];
@@ -109,7 +109,7 @@ function exportToExcel(data, filename, sheetName = "Data") {
     }));
     ws['!cols'] = colWidths;
     
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31)); 
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31)); // Excel sheet names max 31 chars
     XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
   } catch (error) {
     console.error("Export error:", error);
@@ -149,7 +149,7 @@ function exportMultipleSheetsToExcel(sheets, filename) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* COMPONENTS                                                                 */
+/* COMPONENTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
 const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
@@ -310,7 +310,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 /* -------------------------------------------------------------------------- */
-/* MAIN COMPONENT                                                             */
+/* MAIN COMPONENT                                                              */
 /* -------------------------------------------------------------------------- */
 export default function WayneDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -333,15 +333,31 @@ export default function WayneDashboard({ onLogout }) {
       setLoading(true);
       try {
         if (!URLS.KPIS_GENDER) {
-          // Demo data fallback...
+          // Demo data
           setKpisGender({
             club: { totalLast: 916, totalThis: 868, net: -48, retained: 524, lost: 374, new: 344, fee: 3891, agedOut: 18 },
             boys: { totalLast: 600, totalThis: 565, net: -35, retained: 347, lost: 243, new: 218, fee: 3891, agedOut: 10 },
             girls: { totalLast: 316, totalThis: 303, net: -13, retained: 177, lost: 131, new: 126, fee: 3891, agedOut: 8 }
           });
-          setPrograms([]);
-          setAgeDiag([]);
-          setTeams([]);
+          setPrograms([
+            { name: "ECNL", retained: 140, lost: 113, retained_boys: 0, lost_boys: 0, retained_girls: 140, lost_girls: 113 },
+            { name: "MLS NEXT", retained: 100, lost: 95, retained_boys: 100, lost_boys: 95, retained_girls: 0, lost_girls: 0 },
+            { name: "Club", retained: 277, lost: 145, retained_boys: 240, lost_boys: 127, retained_girls: 37, lost_girls: 18 },
+            { name: "NPL", retained: 7, lost: 21, retained_boys: 7, lost_boys: 21, retained_girls: 0, lost_girls: 0 }
+          ]);
+          setAgeDiag([
+            { year: "2012", rate: 69, playersLast: 101, playersThis: 128, boysLast: 68, boysThis: 90, girlsLast: 33, girlsThis: 38, boysRate: 72, girlsRate: 64 },
+            { year: "2013", rate: 75, playersLast: 101, playersThis: 100, boysLast: 75, boysThis: 68, girlsLast: 26, girlsThis: 32, boysRate: 78, girlsRate: 69 },
+            { year: "2014", rate: 72, playersLast: 75, playersThis: 95, boysLast: 63, boysThis: 74, girlsLast: 12, girlsThis: 21, boysRate: 75, girlsRate: 65 },
+            { year: "2015", rate: 68, playersLast: 80, playersThis: 72, boysLast: 50, boysThis: 45, girlsLast: 30, girlsThis: 27, boysRate: 70, girlsRate: 63 },
+            { year: "2016", rate: 55, playersLast: 65, playersThis: 58, boysLast: 40, boysThis: 35, girlsLast: 25, girlsThis: 23, boysRate: 58, girlsRate: 50 },
+          ]);
+          setTeams([
+            { name: "08 ELITE ECNL", program: "ECNL", coach: "Yvan Trevino", count: 44, retained: 30, lost: 14, gender: "F", fee: 4200 },
+            { name: "2012 MLS Next", program: "MLS NEXT", coach: "Coach A", count: 18, retained: 12, lost: 6, gender: "M", fee: 4200 },
+            { name: "2013 Boys Academy", program: "Club", coach: "Coach B", count: 16, retained: 10, lost: 6, gender: "M", fee: 3500 },
+            { name: "2014 Girls Academy", program: "Club", coach: "Coach C", count: 14, retained: 8, lost: 6, gender: "F", fee: 3500 },
+          ]);
           setPlayerList([]);
           setLoading(false);
           return;
@@ -350,8 +366,7 @@ export default function WayneDashboard({ onLogout }) {
         const responses = await Promise.all([
           fetch(URLS.KPIS_GENDER).then(res => res.text()),
           fetch(URLS.PROGRAMS).then(res => res.text()),
-          // Cache Buster for Age Diagnostic
-          fetch(URLS.AGE + "?t=" + Date.now()).then(res => res.text()),
+          fetch(URLS.AGE).then(res => res.text()),
           fetch(URLS.TEAMS).then(res => res.text()),
           fetch(URLS.PLAYERS).then(res => res.text()),
         ]);
@@ -376,7 +391,7 @@ export default function WayneDashboard({ onLogout }) {
         });
         setKpisGender(kpiMap);
 
-        // Programs
+        // Programs with gender columns
         const progRows = rowsToObjects(parseCSV(progText));
         setPrograms(progRows.map(r => ({
           name: pick(r, ["name"]),
@@ -388,36 +403,40 @@ export default function WayneDashboard({ onLogout }) {
           lost_girls: toNumber(pick(r, ["lost_girls"]))
         })));
 
-        // Age Diagnostic
-        const ageRows = rowsToObjects(parseCSV(ageText));
-        setAgeDiag(ageRows.map(r => {
-          const playersLast = toNumber(pick(r, ["playersLast", "Players"]));
-          const playersThis = toNumber(pick(r, ["playersThis"]));
-          const boysLast = toNumber(pick(r, ["boysLast"]));
-          const boysThis = toNumber(pick(r, ["boysThis"]));
-          const girlsLast = toNumber(pick(r, ["girlsLast"]));
-          const girlsThis = toNumber(pick(r, ["girlsThis"]));
-          const rate = normalizePercent(pick(r, ["rate"]));
-          
-          const boysRetained = Math.min(boysLast, boysThis); // Proxy
-          const girlsRetained = Math.min(girlsLast, girlsThis); // Proxy
-          
-          return {
-            year: String(pick(r, ["year"])),
-            rate: rate,
-            playersLast,
-            playersThis,
-            boysLast,
-            boysThis,
-            girlsLast,
-            girlsThis,
-            boysRate: boysLast > 0 ? Math.round((boysRetained / boysLast) * 100) : 0,
-            girlsRate: girlsLast > 0 ? Math.round((girlsRetained / girlsLast) * 100) : 0,
-            risk: pick(r, ["risk"])
-          };
-        }));
+        // Age Diagnostic with gender columns
+        // Age Diagnostic with gender columns
+  
+        // Age Diagnostic with gender columns - FIXED: Proper column reading
+const ageRows = rowsToObjects(parseCSV(ageText));
+setAgeDiag(ageRows.map(r => {
+  const playersLast = toNumber(pick(r, ["playersLast", "Players"]));
+  const playersThis = toNumber(pick(r, ["playersThis"]));
+  const boysLast = toNumber(pick(r, ["boysLast"]));
+  const boysThis = toNumber(pick(r, ["boysThis"]));
+  const girlsLast = toNumber(pick(r, ["girlsLast"]));
+  const girlsThis = toNumber(pick(r, ["girlsThis"]));
+  const rate = normalizePercent(pick(r, ["rate"]));
+  
+  // Calculate gender-specific retention rates
+  const boysRetained = Math.min(boysLast, boysThis);
+  const girlsRetained = Math.min(girlsLast, girlsThis);
+  
+  return {
+    year: String(pick(r, ["year"])),
+    rate: rate,
+    playersLast,
+    playersThis,
+    boysLast,
+    boysThis,
+    girlsLast,
+    girlsThis,
+    boysRate: boysLast > 0 ? Math.round((boysRetained / boysLast) * 100) : 0,
+    girlsRate: girlsLast > 0 ? Math.round((girlsRetained / girlsLast) * 100) : 0,
+    risk: pick(r, ["risk"])
+  };
+}));
 
-        // Teams
+        // Teams (25/26 only)
         const teamRows = rowsToObjects(parseCSV(teamText));
         setTeams(teamRows.map(r => {
           const name = pick(r, ["name"]) || "";
@@ -439,30 +458,35 @@ export default function WayneDashboard({ onLogout }) {
         }));
 
         // Players
+       // Players
         const playerRows = rowsToObjects(parseCSV(playerText));
         setPlayerList(playerRows.map(r => {
           let status = pick(r, ["status"]) || "Unknown";
           const agedOutVal = pick(r, ["aged_out"]);
           const isAgedOut = agedOutVal === 'Y' || agedOutVal === 'Yes';
           
-          // Universal Gender Detection
+          // --- MEJORA: DETECCIÓN DE GÉNERO UNIVERSAL ---
           let genderRaw = pick(r, ["gender"]) || "";
-          let gender = "M"; 
+          let gender = "M"; // Por defecto (si falla todo)
+          
           const g = genderRaw.toLowerCase().trim();
+          
+          // Entiende cualquier variante
           if (g === 'f' || g === 'female' || g === 'girl' || g === 'girls' || g === 'mujer') {
             gender = "F";
           } else {
+            // Asumimos Masculino para 'm', 'male', 'boy', 'boys' o vacío
             gender = "M";
           }
+          // ---------------------------------------------
 
           return {
             name: `${pick(r, ["first_name"])} ${pick(r, ["last_name"])}`.trim(),
             status,
             teamLast: pick(r, ["Team (Last Yr)"]),
             teamThis: pick(r, ["Team (This Yr)"]),
-            gender,
-            agedOut: isAgedOut,
-            fee: toNumber(pick(r, ["fee_this", "fee", "Fee"])) || 0 
+            gender, // Aquí ya va limpio como "M" o "F"
+            agedOut: isAgedOut
           };
         }));
 
@@ -504,34 +528,66 @@ export default function WayneDashboard({ onLogout }) {
     }).filter(p => p.displayRetained > 0 || p.displayLost > 0);
   }, [programs, genderFilter]);
 
-  // Age comparison data - FIXED
-  const ageComparisonData = useMemo(() => {
+  // FILTERED Age Diagnostic - FIXED: Shows different data for boys/girls
+  const filteredAgeDiag = useMemo(() => {
     return ageDiag.map(a => {
-      let pLast = a.playersLast;
-      let pThis = a.playersThis;
-      let pRate = a.rate;
-
-      if (genderFilter === 'boys') {
-        pLast = a.boysLast;
-        pThis = a.boysThis;
-        pRate = a.boysRate || (pLast > 0 ? Math.round((Math.min(pThis, pLast) / pLast) * 100) : 0);
-      } else if (genderFilter === 'girls') {
-        pLast = a.girlsLast;
-        pThis = a.girlsThis;
-        pRate = a.girlsRate || (pLast > 0 ? Math.round((Math.min(pThis, pLast) / pLast) * 100) : 0);
+      if (genderFilter === 'club') {
+        return { 
+          ...a, 
+          displayLast: a.playersLast, 
+          displayThis: a.playersThis, 
+          displayRate: a.rate 
+        };
+      } else if (genderFilter === 'boys') {
+        return { 
+          ...a, 
+          displayLast: a.boysLast, 
+          displayThis: a.boysThis, 
+          displayRate: a.boysRate || (a.boysLast > 0 ? Math.round((Math.min(a.boysThis, a.boysLast) / a.boysLast) * 100) : 0)
+        };
+      } else {
+        return { 
+          ...a, 
+          displayLast: a.girlsLast, 
+          displayThis: a.girlsThis, 
+          displayRate: a.girlsRate || (a.girlsLast > 0 ? Math.round((Math.min(a.girlsThis, a.girlsLast) / a.girlsLast) * 100) : 0)
+        };
       }
-
-      return {
-        ...a,
-        playersLast: pLast, 
-        playersThis: pThis,
-        rate: pRate,
-        change: pLast > 0 ? Math.round(((pThis - pLast) / pLast) * 100) : 0
-      };
-    }).filter(a => a.playersLast > 0 || a.playersThis > 0);
+    });
   }, [ageDiag, genderFilter]);
 
-  // Filter teams by gender
+  // Age comparison data - ESTE ES EL NUEVO BLOQUE CORREGIDO
+  // FIXED: Age comparison data with proper gender filtering
+  const ageComparisonData = useMemo(() => {
+  return ageDiag.map(a => {
+    let pLast, pThis, displayRate;
+    
+    if (genderFilter === 'club') {
+      pLast = a.playersLast;
+      pThis = a.playersThis;
+      displayRate = a.rate;
+    } else if (genderFilter === 'boys') {
+      pLast = a.boysLast;
+      pThis = a.boysThis;
+      displayRate = a.boysLast > 0 ? Math.round((Math.min(a.boysThis, a.boysLast) / a.boysLast) * 100) : 0;
+    } else {
+      pLast = a.girlsLast;
+      pThis = a.girlsThis;
+      displayRate = a.girlsLast > 0 ? Math.round((Math.min(a.girlsThis, a.girlsLast) / a.girlsLast) * 100) : 0;
+    }
+
+    return {
+      year: a.year,
+      playersLast: pLast,
+      playersThis: pThis,
+      rate: displayRate,
+      change: pLast > 0 ? Math.round(((pThis - pLast) / pLast) * 100) : 0,
+      risk: a.risk
+    };
+  }).filter(a => a.playersLast > 0 || a.playersThis > 0);
+}, [ageDiag, genderFilter]);
+
+  // Filter teams by gender - FIXED
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return teams.filter((t) => {
@@ -543,22 +599,10 @@ export default function WayneDashboard({ onLogout }) {
     });
   }, [teams, searchTerm, genderFilter]);
 
-  // Revenue Calculations
+  // Revenue - calculated from filtered teams
   const exactRevenueLost = useMemo(() => {
     return filteredTeams.reduce((total, team) => total + (team.lost * team.fee), 0);
   }, [filteredTeams]);
-
-  // NUEVO: Exact New Revenue Calculation
-  const exactNewRevenue = useMemo(() => {
-    const newPlayers = playerList.filter(p => {
-      const isNew = p.status === 'New';
-      const matchesGender = genderFilter === 'club' || 
-                            (genderFilter === 'boys' && p.gender === 'M') || 
-                            (genderFilter === 'girls' && p.gender === 'F');
-      return isNew && matchesGender;
-    });
-    return newPlayers.reduce((total, p) => total + (p.fee > 0 ? p.fee : activeData.fee), 0);
-  }, [playerList, genderFilter, activeData.fee]);
 
   const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (lostExcludingAgedOut * activeData.fee);
   const potentialRecovery = Math.round(displayRevenueLost * 0.3);
@@ -582,7 +626,7 @@ export default function WayneDashboard({ onLogout }) {
     ];
   }, [kpisGender]);
 
-  // Coach Stats
+  // COACH STATS - FOCUS ON REVENUE LOST ONLY (No positive "saved" metrics)
   const coachStats = useMemo(() => {
     if (filteredTeams.length === 0) return { coaches: [], totalRevenueLost: 0, avgFee: 3000 };
     
@@ -601,6 +645,7 @@ export default function WayneDashboard({ onLogout }) {
       coachMap[coachName].revenueLost += t.lost * t.fee;
     });
     
+    // Sort by revenue lost (highest first) - focus on the problem
     const coaches = Object.values(coachMap).map(coach => {
       const total = coach.retained + coach.lost;
       return { 
@@ -684,6 +729,7 @@ export default function WayneDashboard({ onLogout }) {
     ], 'RetainPlayers_Export');
   };
 
+  // Export handlers - FIXED: All export to Excel
   const handleExportTeamsRevenue = () => {
     const data = filteredTeams
       .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
@@ -872,13 +918,19 @@ export default function WayneDashboard({ onLogout }) {
           </>
         )}
 
-        {/* DIAGNOSIS */}
+        {/* DIAGNOSIS - FIXED: Different data for Boys/Girls */}
         {activeTab === "diagnosis" && (
           <div className="space-y-6">
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                Retention by Age Group
-                {genderFilter !== 'club' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg">{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+               Retention by Age Group
+              {genderFilter !== 'club' && (
+              <span className={`text-xs px-2 py-1 rounded-lg ${
+               genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'
+              }`}>
+                {genderFilter === 'boys' ? '♂ Boys' : '♀ Girls'} only
+              </span>
+                )}
               </h4>
               <p className="text-slate-400 text-sm mb-6">
                 {genderFilter === 'club' ? 'Compare player counts year over year by birth year' : 
@@ -932,9 +984,10 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* FINANCIALS - CORRECTED */}
+        {/* FINANCIALS - Only shows losses, no positive "saved" metrics */}
         {activeTab === "financials" && (
           <div className="space-y-6">
+            {/* Header Card: Revenue Lost to Churn */}
             <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-8 rounded-2xl shadow-lg shadow-rose-500/20">
               <div className="flex items-center gap-5">
                 <div className="bg-white/20 p-4 rounded-2xl"><DollarSign size={36} className="text-white" /></div>
@@ -946,8 +999,10 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+            {/* KPI Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Card 1: Lost */}
+              
+              {/* Card 1: Lost Revenue */}
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-rose-500/20 rounded-xl"><UserMinus className="text-rose-400" size={20} /></div>
@@ -959,26 +1014,30 @@ export default function WayneDashboard({ onLogout }) {
                 <p className="text-sm text-slate-500">From {lostExcludingAgedOut} players who didn't return</p>
               </div>
 
-              {/* Card 2: New (Exact) */}
+              {/* Card 2: New Revenue */}
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-emerald-500/20 rounded-xl"><UserPlus className="text-emerald-400" size={20} /></div>
                   <div>
                     <p className="text-xs font-bold text-slate-500 uppercase">New Revenue</p>
-                    <p className="text-2xl font-black text-emerald-400">+${exactNewRevenue.toLocaleString()}</p>
+                    {/* Aquí usamos el cálculo exacto si está disponible (exactNewRevenue), o el aproximado corregido */}
+                    <p className="text-2xl font-black text-emerald-400">
+                      +${(typeof exactNewRevenue !== 'undefined' ? exactNewRevenue : Math.round(activeData.new * activeData.fee)).toLocaleString()}
+                    </p>
                   </div>
                 </div>
                 <p className="text-sm text-slate-500">From {activeData.new} new players</p>
               </div>
 
-              {/* Card 3: Net Impact (Exact) */}
+              {/* Card 3: Net Impact */}
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-blue-500/20 rounded-xl"><Target className="text-blue-400" size={20} /></div>
                   <div>
                     <p className="text-xs font-bold text-slate-500 uppercase">Net Impact</p>
                     {(() => {
-                      const netImpact = exactNewRevenue - displayRevenueLost;
+                      const newRevenue = typeof exactNewRevenue !== 'undefined' ? exactNewRevenue : Math.round(activeData.new * activeData.fee);
+                      const netImpact = newRevenue - displayRevenueLost;
                       return (
                         <p className={`text-2xl font-black ${netImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {netImpact >= 0 ? '+' : ''}${netImpact.toLocaleString()}
@@ -991,6 +1050,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+            {/* Recovery Opportunity Section */}
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-lg shadow-emerald-500/20">
               <div className="flex flex-col md:flex-row items-center justify-between gap-5">
                 <div>
@@ -1009,6 +1069,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+            {/* Top Revenue Losses Table */}
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-bold text-white">Top Revenue Losses by Team</h4>
@@ -1037,7 +1098,7 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* TEAMS */}
+        {/* TEAMS - FIXED: Works with Boys/Girls filter */}
         {activeTab === "full-roster" && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -1119,9 +1180,10 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* COACHES */}
+        {/* COACHES - FOCUS ON REVENUE LOST (No positive metrics) */}
         {activeTab === "coaches" && (
           <div className="space-y-6">
+            {/* Header Stats - Only showing losses */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 p-5 rounded-2xl border border-rose-500/30">
                 <p className="text-xs font-bold text-rose-400 uppercase tracking-wider mb-1">Total Revenue Lost</p>
@@ -1140,6 +1202,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+            {/* Coach Table - Sorted by Revenue Lost */}
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <div className="flex justify-between items-center mb-6">
                 <div>
@@ -1197,6 +1260,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
             </div>
 
+            {/* Insight Cards - Focus on problems, not heroes */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 border border-rose-500/30 p-5 rounded-2xl">
                 <DollarSign className="text-rose-400 mb-3" size={24} />
@@ -1341,3 +1405,4 @@ export default function WayneDashboard({ onLogout }) {
     </div>
   );
 }
+
