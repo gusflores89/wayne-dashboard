@@ -600,10 +600,27 @@ setAgeDiag(ageRows.map(r => {
   }, [teams, searchTerm, genderFilter]);
 
   // Revenue - calculated from filtered teams
+// 1. Revenue Lost (Mantener esto)
   const exactRevenueLost = useMemo(() => {
     return filteredTeams.reduce((total, team) => total + (team.lost * team.fee), 0);
   }, [filteredTeams]);
 
+  // 2. New Revenue (AGREGAR ESTO NUEVO)
+  const exactNewRevenue = useMemo(() => {
+    // Filtramos jugadores "New" respetando el filtro de género
+    const newPlayers = playerList.filter(p => {
+      const isNew = p.status === 'New';
+      const matchesGender = genderFilter === 'club' || 
+                            (genderFilter === 'boys' && p.gender === 'M') || 
+                            (genderFilter === 'girls' && p.gender === 'F');
+      return isNew && matchesGender;
+    });
+
+    // Sumamos sus cuotas individuales
+    return newPlayers.reduce((total, p) => total + (p.fee > 0 ? p.fee : activeData.fee), 0);
+  }, [playerList, genderFilter, activeData.fee]);
+
+  // 3. Display Variables (Mantener esto)
   const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (lostExcludingAgedOut * activeData.fee);
   const potentialRecovery = Math.round(displayRevenueLost * 0.3);
 
@@ -987,6 +1004,7 @@ setAgeDiag(ageRows.map(r => {
         {/* FINANCIALS - Only shows losses, no positive "saved" metrics */}
         {activeTab === "financials" && (
           <div className="space-y-6">
+            {/* Header Card: Revenue Lost to Churn */}
             <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-8 rounded-2xl shadow-lg shadow-rose-500/20">
               <div className="flex items-center gap-5">
                 <div className="bg-white/20 p-4 rounded-2xl"><DollarSign size={36} className="text-white" /></div>
@@ -998,7 +1016,10 @@ setAgeDiag(ageRows.map(r => {
               </div>
             </div>
 
+            {/* KPI Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              {/* Card 1: Lost Revenue */}
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-rose-500/20 rounded-xl"><UserMinus className="text-rose-400" size={20} /></div>
@@ -1009,35 +1030,44 @@ setAgeDiag(ageRows.map(r => {
                 </div>
                 <p className="text-sm text-slate-500">From {lostExcludingAgedOut} players who didn't return</p>
               </div>
-                <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
-  <div className="flex items-center gap-3 mb-3">
-    <div className="p-2.5 bg-emerald-500/20 rounded-xl"><UserPlus className="text-emerald-400" size={20} /></div>
-    <div>
-      <p className="text-xs font-bold text-slate-500 uppercase">New Revenue</p>
-      <p className="text-2xl font-black text-emerald-400">+${Math.round(activeData.new * activeData.fee).toLocaleString()}</p>
-    </div>
-  </div>
-  <p className="text-sm text-slate-500">From {activeData.new} new players</p>
-</div>
-<div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
-  <div className="flex items-center gap-3 mb-3">
-    <div className="p-2.5 bg-blue-500/20 rounded-xl"><Target className="text-blue-400" size={20} /></div>
-    <div>
-      <p className="text-xs font-bold text-slate-500 uppercase">Net Impact</p>
-      {(() => {
-        const newRevenue = Math.round(activeData.new * activeData.fee);
-        const netImpact = newRevenue - displayRevenueLost;
-        return (
-          <p className={`text-2xl font-black ${netImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {netImpact >= 0 ? '+' : ''}${netImpact.toLocaleString()}
-          </p>
-        );
-      })()}
-    </div>
-  </div>
-  <p className="text-sm text-slate-500">New Revenue - Lost Revenue</p>
-</div>  
 
+              {/* Card 2: New Revenue */}
+              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-emerald-500/20 rounded-xl"><UserPlus className="text-emerald-400" size={20} /></div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">New Revenue</p>
+                    {/* Aquí usamos el cálculo exacto si está disponible (exactNewRevenue), o el aproximado corregido */}
+                    <p className="text-2xl font-black text-emerald-400">
+                      +${(typeof exactNewRevenue !== 'undefined' ? exactNewRevenue : Math.round(activeData.new * activeData.fee)).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-500">From {activeData.new} new players</p>
+              </div>
+
+              {/* Card 3: Net Impact */}
+              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2.5 bg-blue-500/20 rounded-xl"><Target className="text-blue-400" size={20} /></div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Net Impact</p>
+                    {(() => {
+                      const newRevenue = typeof exactNewRevenue !== 'undefined' ? exactNewRevenue : Math.round(activeData.new * activeData.fee);
+                      const netImpact = newRevenue - displayRevenueLost;
+                      return (
+                        <p className={`text-2xl font-black ${netImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {netImpact >= 0 ? '+' : ''}${netImpact.toLocaleString()}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <p className="text-sm text-slate-500">New Revenue - Lost Revenue</p>
+              </div>
+            </div>
+
+            {/* Recovery Opportunity Section */}
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-lg shadow-emerald-500/20">
               <div className="flex flex-col md:flex-row items-center justify-between gap-5">
                 <div>
@@ -1056,7 +1086,7 @@ setAgeDiag(ageRows.map(r => {
               </div>
             </div>
 
-            {/* Top Revenue Losses by Team - FIXED EXPORT */}
+            {/* Top Revenue Losses Table */}
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-bold text-white">Top Revenue Losses by Team</h4>
@@ -1072,14 +1102,14 @@ setAgeDiag(ageRows.map(r => {
                   .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
                   .slice(0, 5)
                   .map((team, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
-                    <div>
-                      <p className="font-bold text-white">{team.name}</p>
-                      <p className="text-xs text-slate-500">{team.lost} players × ${team.fee}</p>
+                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                      <div>
+                        <p className="font-bold text-white">{team.name}</p>
+                        <p className="text-xs text-slate-500">{team.lost} players × ${team.fee}</p>
+                      </div>
+                      <p className="text-lg font-black text-rose-400">-${(team.lost * team.fee).toLocaleString()}</p>
                     </div>
-                    <p className="text-lg font-black text-rose-400">-${(team.lost * team.fee).toLocaleString()}</p>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
