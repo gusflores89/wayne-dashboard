@@ -404,25 +404,37 @@ export default function WayneDashboard({ onLogout }) {
         })));
 
         // Age Diagnostic with gender columns
-        const ageRows = rowsToObjects(parseCSV(ageText));
-        setAgeDiag(ageRows.map(r => ({
-          year: pick(r, ["year"]),
-          rate: normalizePercent(pick(r, ["rate"])),
-          playersLast: toNumber(pick(r, ["playersLast"])),
-          playersThis: toNumber(pick(r, ["playersThis"])),
-          boysLast: toNumber(pick(r, ["boysLast"])),
-          boysThis: toNumber(pick(r, ["boysThis"])),
-          girlsLast: toNumber(pick(r, ["girlsLast"])),
-          girlsThis: toNumber(pick(r, ["girlsThis"])),
-          // Calculate gender-specific rates
-          boysRate: toNumber(pick(r, ["boysLast"])) > 0 
-            ? Math.round((Math.min(toNumber(pick(r, ["boysThis"])), toNumber(pick(r, ["boysLast"]))) / toNumber(pick(r, ["boysLast"]))) * 100) 
-            : 0,
-          girlsRate: toNumber(pick(r, ["girlsLast"])) > 0 
-            ? Math.round((Math.min(toNumber(pick(r, ["girlsThis"])), toNumber(pick(r, ["girlsLast"]))) / toNumber(pick(r, ["girlsLast"]))) * 100) 
-            : 0,
-          risk: pick(r, ["risk"])
-        })));
+        // Age Diagnostic with gender columns
+  
+        // Age Diagnostic with gender columns - FIXED: Proper column reading
+const ageRows = rowsToObjects(parseCSV(ageText));
+setAgeDiag(ageRows.map(r => {
+  const playersLast = toNumber(pick(r, ["playersLast", "Players"]));
+  const playersThis = toNumber(pick(r, ["playersThis"]));
+  const boysLast = toNumber(pick(r, ["boysLast"]));
+  const boysThis = toNumber(pick(r, ["boysThis"]));
+  const girlsLast = toNumber(pick(r, ["girlsLast"]));
+  const girlsThis = toNumber(pick(r, ["girlsThis"]));
+  const rate = normalizePercent(pick(r, ["rate"]));
+  
+  // Calculate gender-specific retention rates
+  const boysRetained = Math.min(boysLast, boysThis);
+  const girlsRetained = Math.min(girlsLast, girlsThis);
+  
+  return {
+    year: String(pick(r, ["year"])),
+    rate: rate,
+    playersLast,
+    playersThis,
+    boysLast,
+    boysThis,
+    girlsLast,
+    girlsThis,
+    boysRate: boysLast > 0 ? Math.round((boysRetained / boysLast) * 100) : 0,
+    girlsRate: girlsLast > 0 ? Math.round((girlsRetained / girlsLast) * 100) : 0,
+    risk: pick(r, ["risk"])
+  };
+}));
 
         // Teams (25/26 only)
         const teamRows = rowsToObjects(parseCSV(teamText));
@@ -446,21 +458,34 @@ export default function WayneDashboard({ onLogout }) {
         }));
 
         // Players
+       // Players
         const playerRows = rowsToObjects(parseCSV(playerText));
         setPlayerList(playerRows.map(r => {
           let status = pick(r, ["status"]) || "Unknown";
           const agedOutVal = pick(r, ["aged_out"]);
           const isAgedOut = agedOutVal === 'Y' || agedOutVal === 'Yes';
-          let gender = pick(r, ["gender"]) || "";
-          if (gender.toUpperCase() === 'M') gender = "M";
-          else if (gender.toUpperCase() === 'F') gender = "F";
+          
+          // --- MEJORA: DETECCIÓN DE GÉNERO UNIVERSAL ---
+          let genderRaw = pick(r, ["gender"]) || "";
+          let gender = "M"; // Por defecto (si falla todo)
+          
+          const g = genderRaw.toLowerCase().trim();
+          
+          // Entiende cualquier variante
+          if (g === 'f' || g === 'female' || g === 'girl' || g === 'girls' || g === 'mujer') {
+            gender = "F";
+          } else {
+            // Asumimos Masculino para 'm', 'male', 'boy', 'boys' o vacío
+            gender = "M";
+          }
+          // ---------------------------------------------
 
           return {
             name: `${pick(r, ["first_name"])} ${pick(r, ["last_name"])}`.trim(),
             status,
             teamLast: pick(r, ["Team (Last Yr)"]),
             teamThis: pick(r, ["Team (This Yr)"]),
-            gender,
+            gender, // Aquí ya va limpio como "M" o "F"
             agedOut: isAgedOut
           };
         }));
@@ -532,31 +557,35 @@ export default function WayneDashboard({ onLogout }) {
   }, [ageDiag, genderFilter]);
 
   // Age comparison data - ESTE ES EL NUEVO BLOQUE CORREGIDO
+  // FIXED: Age comparison data with proper gender filtering
   const ageComparisonData = useMemo(() => {
-    return ageDiag.map(a => {
-      // 1. Por defecto usamos los totales del Club
-      let pLast = a.playersLast;
-      let pThis = a.playersThis;
-      
-      // 2. Si el usuario filtró por Boys o Girls, cambiamos las columnas
-      if (genderFilter === 'boys') {
-        pLast = a.boysLast;
-        pThis = a.boysThis;
-      } else if (genderFilter === 'girls') {
-        pLast = a.girlsLast;
-        pThis = a.girlsThis;
-      }
+  return ageDiag.map(a => {
+    let pLast, pThis, displayRate;
+    
+    if (genderFilter === 'club') {
+      pLast = a.playersLast;
+      pThis = a.playersThis;
+      displayRate = a.rate;
+    } else if (genderFilter === 'boys') {
+      pLast = a.boysLast;
+      pThis = a.boysThis;
+      displayRate = a.boysLast > 0 ? Math.round((Math.min(a.boysThis, a.boysLast) / a.boysLast) * 100) : 0;
+    } else {
+      pLast = a.girlsLast;
+      pThis = a.girlsThis;
+      displayRate = a.girlsLast > 0 ? Math.round((Math.min(a.girlsThis, a.girlsLast) / a.girlsLast) * 100) : 0;
+    }
 
-      // 3. Devolvemos los datos listos para el gráfico
-      return {
-        ...a,
-        playersLast: pLast, 
-        playersThis: pThis,
-        // Recalculamos el porcentaje de cambio automáticamente
-        change: pLast > 0 ? Math.round(((pThis - pLast) / pLast) * 100) : 0
-      };
-    });
-  }, [ageDiag, genderFilter]);
+    return {
+      year: a.year,
+      playersLast: pLast,
+      playersThis: pThis,
+      rate: displayRate,
+      change: pLast > 0 ? Math.round(((pThis - pLast) / pLast) * 100) : 0,
+      risk: a.risk
+    };
+  }).filter(a => a.playersLast > 0 || a.playersThis > 0);
+}, [ageDiag, genderFilter]);
 
   // Filter teams by gender - FIXED
   const filteredTeams = useMemo(() => {
@@ -894,8 +923,14 @@ export default function WayneDashboard({ onLogout }) {
           <div className="space-y-6">
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                Retention by Age Group
-                {genderFilter !== 'club' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg">{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+               Retention by Age Group
+              {genderFilter !== 'club' && (
+              <span className={`text-xs px-2 py-1 rounded-lg ${
+               genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'
+              }`}>
+                {genderFilter === 'boys' ? '♂ Boys' : '♀ Girls'} only
+              </span>
+                )}
               </h4>
               <p className="text-slate-400 text-sm mb-6">
                 {genderFilter === 'club' ? 'Compare player counts year over year by birth year' : 
@@ -974,28 +1009,34 @@ export default function WayneDashboard({ onLogout }) {
                 </div>
                 <p className="text-sm text-slate-500">From {lostExcludingAgedOut} players who didn't return</p>
               </div>
-              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2.5 bg-emerald-500/20 rounded-xl"><UserPlus className="text-emerald-400" size={20} /></div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase">New Revenue</p>
-                    <p className="text-2xl font-black text-emerald-400">+${(activeData.new * activeData.fee).toLocaleString()}</p>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-500">From {activeData.new} new players</p>
-              </div>
-              <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2.5 bg-blue-500/20 rounded-xl"><Target className="text-blue-400" size={20} /></div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase">Net Impact</p>
-                    <p className={`text-2xl font-black ${activeData.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {activeData.net >= 0 ? '+' : ''}${(activeData.net * activeData.fee).toLocaleString()}</p>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-500">Net change of {activeData.net} players</p>
-              </div>
-            </div>
+                <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
+  <div className="flex items-center gap-3 mb-3">
+    <div className="p-2.5 bg-emerald-500/20 rounded-xl"><UserPlus className="text-emerald-400" size={20} /></div>
+    <div>
+      <p className="text-xs font-bold text-slate-500 uppercase">New Revenue</p>
+      <p className="text-2xl font-black text-emerald-400">+${Math.round(activeData.new * activeData.fee).toLocaleString()}</p>
+    </div>
+  </div>
+  <p className="text-sm text-slate-500">From {activeData.new} new players</p>
+</div>
+<div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
+  <div className="flex items-center gap-3 mb-3">
+    <div className="p-2.5 bg-blue-500/20 rounded-xl"><Target className="text-blue-400" size={20} /></div>
+    <div>
+      <p className="text-xs font-bold text-slate-500 uppercase">Net Impact</p>
+      {(() => {
+        const newRevenue = Math.round(activeData.new * activeData.fee);
+        const netImpact = newRevenue - displayRevenueLost;
+        return (
+          <p className={`text-2xl font-black ${netImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {netImpact >= 0 ? '+' : ''}${netImpact.toLocaleString()}
+          </p>
+        );
+      })()}
+    </div>
+  </div>
+  <p className="text-sm text-slate-500">New Revenue - Lost Revenue</p>
+</div>  
 
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-lg shadow-emerald-500/20">
               <div className="flex flex-col md:flex-row items-center justify-between gap-5">
