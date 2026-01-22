@@ -24,6 +24,7 @@ const getEnvVar = (key) => {
 const URLS = {
   KPIS_GENDER: getEnvVar("VITE_SHEET_KPIS_GENDER_CSV"),
   PROGRAMS: getEnvVar("VITE_SHEET_PROGRAMS_CSV"),
+  PROGRAMS_RAW: getEnvVar("VITE_SHEET_PROGRAMS_RAW_CSV"), // [CHANGE #1] Added programs_raw URL
   AGE: getEnvVar("VITE_SHEET_AGE_CSV"),
   TEAMS: getEnvVar("VITE_SHEET_TEAMS_CSV"),
   PLAYERS: getEnvVar("VITE_SHEET_PLAYERS_CSV")
@@ -100,7 +101,6 @@ function exportToExcel(data, filename, sheetName = "Data") {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     
-    // Auto-width columns
     const colWidths = Object.keys(data[0]).map(key => ({
       wch: Math.max(
         key.length + 2,
@@ -109,7 +109,7 @@ function exportToExcel(data, filename, sheetName = "Data") {
     }));
     ws['!cols'] = colWidths;
     
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31)); // Excel sheet names max 31 chars
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
     XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
   } catch (error) {
     console.error("Export error:", error);
@@ -147,6 +147,13 @@ function exportMultipleSheetsToExcel(sheets, filename) {
     alert("Error exporting file. Please try again.");
   }
 }
+
+// [CHANGE #3] Consistent colors for gender filter
+const GENDER_COLORS = {
+  club: { primary: '#3b82f6', secondary: '#60a5fa', accent: '#93c5fd' },
+  boys: { primary: '#3b82f6', secondary: '#60a5fa', accent: '#93c5fd' },
+  girls: { primary: '#ec4899', secondary: '#f472b6', accent: '#f9a8d4' }
+};
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENTS                                                                  */
@@ -250,47 +257,53 @@ const Scorecard = ({ label, value, sub, highlight, colorClass = "" }) => (
   </div>
 );
 
-const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick, clickable, tooltip }) => (
-  <div 
-    className={`bg-[#070D1F] p-5 rounded-2xl border border-[#3A7FC3]/30 flex flex-col justify-between ${
-      clickable ? "cursor-pointer hover:border-[#5DB3F5]/50 transition-all" : ""
-    }`}
-    onClick={clickable ? onClick : undefined}
-  >
-    <div className="flex items-start justify-between">
-      <div className={`p-2.5 rounded-xl ${color} bg-opacity-20`}>
-        <Icon size={20} className={color.replace('bg-', 'text-').replace('-600', '-400').replace('-500', '-400')} />
-      </div>
-      <div className="flex items-center gap-2">
-        {tooltip && (
-          <div className="group relative">
-            <Info size={14} className="text-slate-500 cursor-help" />
-            <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-[#070D1F] text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-[#3A7FC3]/50 pointer-events-none">
-              {tooltip}
+// [CHANGE #3] Updated KPIBox to use gender-consistent colors
+const KPIBox = ({ title, value, sub, percent, icon: Icon, color, trend, onClick, clickable, tooltip, genderFilter = 'club' }) => {
+  const colors = GENDER_COLORS[genderFilter] || GENDER_COLORS.club;
+  
+  return (
+    <div 
+      className={`bg-[#070D1F] p-5 rounded-2xl border border-[#3A7FC3]/30 flex flex-col justify-between ${
+        clickable ? "cursor-pointer hover:border-[#5DB3F5]/50 transition-all" : ""
+      }`}
+      onClick={clickable ? onClick : undefined}
+    >
+      <div className="flex items-start justify-between">
+        <div className={`p-2.5 rounded-xl ${color} bg-opacity-20`}>
+          <Icon size={20} className={color.replace('bg-', 'text-').replace('-600', '-400').replace('-500', '-400')} />
+        </div>
+        <div className="flex items-center gap-2">
+          {tooltip && (
+            <div className="group relative">
+              <Info size={14} className="text-slate-500 cursor-help" />
+              <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-[#070D1F] text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-[#3A7FC3]/50 pointer-events-none">
+                {tooltip}
+              </div>
             </div>
-          </div>
-        )}
-        {percent && (
-          <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
-            trend === "up" ? "bg-emerald-500/20 text-emerald-400" : 
-            trend === "down" ? "bg-rose-500/20 text-rose-400" : 
-            "bg-slate-700 text-slate-400"
-          }`}>
-            {percent}
-          </span>
-        )}
+          )}
+          {percent && (
+            <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
+              trend === "up" ? "bg-emerald-500/20 text-emerald-400" : 
+              trend === "down" ? "bg-rose-500/20 text-rose-400" : 
+              "bg-slate-700 text-slate-400"
+            }`}>
+              {percent}
+            </span>
+          )}
+        </div>
       </div>
+      <div className="mt-4">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</p>
+        <h3 className="text-3xl font-black text-white">{value}</h3>
+        <p className={`text-xs mt-1 font-medium ${
+          trend === "up" ? "text-emerald-400" : trend === "down" ? "text-rose-400" : "text-slate-500"
+        }`}>{sub}</p>
+      </div>
+      {/* [CHANGE #5] Only show "Click for details" if clickable AND has onClick */}
+      {clickable && onClick && <p className="text-xs mt-3 text-[#5DB3F5] font-medium">Click for details →</p>}
     </div>
-    <div className="mt-4">
-      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</p>
-      <h3 className="text-3xl font-black text-white">{value}</h3>
-      <p className={`text-xs mt-1 font-medium ${
-        trend === "up" ? "text-emerald-400" : trend === "down" ? "text-rose-400" : "text-slate-500"
-      }`}>{sub}</p>
-    </div>
-    {clickable && <p className="text-xs mt-3 text-[#5DB3F5] font-medium">Click for details →</p>}
-  </div>
-);
+  );
+};
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -310,6 +323,58 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 /* -------------------------------------------------------------------------- */
+/* LOGIN COMPONENT - [CHANGE #12] Added logo                                   */
+/* -------------------------------------------------------------------------- */
+const LoginScreen = ({ onLogin }) => {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Simple password check - in production, use proper auth
+    if (password === 'retainplayers2025') {
+      localStorage.setItem("rp_authenticated", "true");
+      localStorage.setItem("rp_auth_time", Date.now().toString());
+      onLogin();
+    } else {
+      setError('Incorrect password');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0C1B46] flex items-center justify-center p-4">
+      <div className="bg-[#070D1F] p-8 rounded-2xl border border-[#3A7FC3]/30 w-full max-w-md">
+        {/* [CHANGE #12] Logo added */}
+        <div className="flex justify-center mb-6">
+          <img src="/logo.png" alt="RetainPlayers" className="w-20 h-20" />
+        </div>
+        <h1 className="text-2xl font-black text-white text-center mb-2" style={{ fontFamily: 'Oswald, sans-serif' }}>
+          RETAIN<span className="text-[#5DB3F5]">PLAYERS</span>
+        </h1>
+        <p className="text-slate-400 text-center text-sm mb-6">Enter password to access dashboard</p>
+        
+        <form onSubmit={handleSubmit}>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl py-3 px-4 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 mb-4"
+          />
+          {error && <p className="text-rose-400 text-sm mb-4">{error}</p>}
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors"
+          >
+            Access Dashboard
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
 /* MAIN COMPONENT                                                              */
 /* -------------------------------------------------------------------------- */
 export default function WayneDashboard({ onLogout }) {
@@ -324,9 +389,13 @@ export default function WayneDashboard({ onLogout }) {
 
   const [kpisGender, setKpisGender] = useState(null);
   const [programs, setPrograms] = useState([]);
+  const [programsRaw, setProgramsRaw] = useState([]); // [CHANGE #1] Added programsRaw state
   const [ageDiag, setAgeDiag] = useState([]);
   const [teams, setTeams] = useState([]);
   const [playerList, setPlayerList] = useState([]);
+
+  // [CHANGE #3] Get current gender colors
+  const currentColors = GENDER_COLORS[genderFilter] || GENDER_COLORS.club;
 
   useEffect(() => {
     async function loadData() {
@@ -339,6 +408,18 @@ export default function WayneDashboard({ onLogout }) {
             boys: { totalLast: 600, totalThis: 565, net: -35, retained: 347, lost: 243, new: 218, fee: 3891, agedOut: 10 },
             girls: { totalLast: 316, totalThis: 303, net: -13, retained: 177, lost: 131, new: 126, fee: 3891, agedOut: 8 }
           });
+          // [CHANGE #1] Demo data for programsRaw with ALL programs
+          setProgramsRaw([
+            { name: "Girls ECNL", retained: 120, lost: 108, lastYear: 236, thisYear: 120, retentionRate: 51, churn: 46 },
+            { name: "Pre-ECNL", retained: 20, lost: 5, lastYear: 25, thisYear: 20, retentionRate: 80, churn: 20 },
+            { name: "Girls 9v9", retained: 6, lost: 6, lastYear: 12, thisYear: 6, retentionRate: 50, churn: 50 },
+            { name: "Girls 7v7", retained: 8, lost: 4, lastYear: 12, thisYear: 10, retentionRate: 67, churn: 33 },
+            { name: "Boys MLS Next", retained: 100, lost: 95, lastYear: 200, thisYear: 150, retentionRate: 50, churn: 48 },
+            { name: "Boys MLS Next 2", retained: 45, lost: 30, lastYear: 80, thisYear: 60, retentionRate: 56, churn: 38 },
+            { name: "Boys Academy", retained: 150, lost: 80, lastYear: 240, thisYear: 200, retentionRate: 63, churn: 33 },
+            { name: "Boys 9v9", retained: 40, lost: 25, lastYear: 70, thisYear: 55, retentionRate: 57, churn: 36 },
+            { name: "Boys 7v7", retained: 35, lost: 21, lastYear: 61, thisYear: 47, retentionRate: 57, churn: 34 },
+          ]);
           setPrograms([
             { name: "ECNL", retained: 140, lost: 113, retained_boys: 0, lost_boys: 0, retained_girls: 140, lost_girls: 113 },
             { name: "MLS NEXT", retained: 100, lost: 95, retained_boys: 100, lost_boys: 95, retained_girls: 0, lost_girls: 0 },
@@ -346,32 +427,47 @@ export default function WayneDashboard({ onLogout }) {
             { name: "NPL", retained: 7, lost: 21, retained_boys: 7, lost_boys: 21, retained_girls: 0, lost_girls: 0 }
           ]);
           setAgeDiag([
-            { year: "2012", rate: 69, playersLast: 101, playersThis: 128, boysLast: 68, boysThis: 90, girlsLast: 33, girlsThis: 38, boysRate: 72, girlsRate: 64 },
-            { year: "2013", rate: 75, playersLast: 101, playersThis: 100, boysLast: 75, boysThis: 68, girlsLast: 26, girlsThis: 32, boysRate: 78, girlsRate: 69 },
-            { year: "2014", rate: 72, playersLast: 75, playersThis: 95, boysLast: 63, boysThis: 74, girlsLast: 12, girlsThis: 21, boysRate: 75, girlsRate: 65 },
-            { year: "2015", rate: 68, playersLast: 80, playersThis: 72, boysLast: 50, boysThis: 45, girlsLast: 30, girlsThis: 27, boysRate: 70, girlsRate: 63 },
-            { year: "2016", rate: 55, playersLast: 65, playersThis: 58, boysLast: 40, boysThis: 35, girlsLast: 25, girlsThis: 23, boysRate: 58, girlsRate: 50 },
+            { year: "2019", rate: 72, playersLast: 45, playersThis: 65, boysLast: 30, boysThis: 42, girlsLast: 15, girlsThis: 23, boysRate: 75, girlsRate: 67, risk: "Low" },
+            { year: "2018", rate: 70, playersLast: 55, playersThis: 70, boysLast: 35, boysThis: 45, girlsLast: 20, girlsThis: 25, boysRate: 72, girlsRate: 65, risk: "Low" },
+            { year: "2017", rate: 68, playersLast: 60, playersThis: 65, boysLast: 38, boysThis: 40, girlsLast: 22, girlsThis: 25, boysRate: 70, girlsRate: 64, risk: "Medium" },
+            { year: "2016", rate: 55, playersLast: 65, playersThis: 58, boysLast: 40, boysThis: 35, girlsLast: 25, girlsThis: 23, boysRate: 58, girlsRate: 50, risk: "Medium" },
+            { year: "2015", rate: 68, playersLast: 80, playersThis: 72, boysLast: 50, boysThis: 45, girlsLast: 30, girlsThis: 27, boysRate: 70, girlsRate: 63, risk: "Medium" },
+            { year: "2014", rate: 72, playersLast: 75, playersThis: 95, boysLast: 63, boysThis: 74, girlsLast: 12, girlsThis: 21, boysRate: 75, girlsRate: 65, risk: "Low" },
+            { year: "2013", rate: 75, playersLast: 101, playersThis: 100, boysLast: 75, boysThis: 68, girlsLast: 26, girlsThis: 32, boysRate: 78, girlsRate: 69, risk: "Low" },
+            { year: "2012", rate: 69, playersLast: 101, playersThis: 128, boysLast: 68, boysThis: 90, girlsLast: 33, girlsThis: 38, boysRate: 72, girlsRate: 64, risk: "Low" },
+            { year: "2011", rate: 61, playersLast: 90, playersThis: 78, boysLast: 57, boysThis: 48, girlsLast: 33, girlsThis: 30, boysRate: 63, girlsRate: 58, risk: "Medium" },
+            { year: "2010", rate: 56, playersLast: 85, playersThis: 65, boysLast: 52, boysThis: 40, girlsLast: 33, girlsThis: 25, boysRate: 58, girlsRate: 52, risk: "Medium" },
+            { year: "2009", rate: 52, playersLast: 75, playersThis: 50, boysLast: 45, boysThis: 30, girlsLast: 30, girlsThis: 20, boysRate: 55, girlsRate: 47, risk: "High" },
+            { year: "2008", rate: 58, playersLast: 82, playersThis: 60, boysLast: 50, boysThis: 38, girlsLast: 32, girlsThis: 22, boysRate: 60, girlsRate: 53, risk: "Medium" },
+            { year: "2007", rate: 3, playersLast: 70, playersThis: 10, boysLast: 37, boysThis: 6, girlsLast: 33, girlsThis: 4, boysRate: 5, girlsRate: 0, risk: "High" },
           ]);
           setTeams([
-            { name: "08 ELITE ECNL", program: "ECNL", coach: "Yvan Trevino", count: 44, retained: 30, lost: 14, gender: "F", fee: 4200 },
-            { name: "2012 MLS Next", program: "MLS NEXT", coach: "Coach A", count: 18, retained: 12, lost: 6, gender: "M", fee: 4200 },
-            { name: "2013 Boys Academy", program: "Club", coach: "Coach B", count: 16, retained: 10, lost: 6, gender: "M", fee: 3500 },
-            { name: "2014 Girls Academy", program: "Club", coach: "Coach C", count: 14, retained: 8, lost: 6, gender: "F", fee: 3500 },
+            { name: "08 ELITE ECNL", program: "ECNL", coach: "Yvan Trevino", count: 44, retained: 30, lost: 14, gender: "F", fee: 4200, lastYear: 44, newPlayers: 14 },
+            { name: "2012 MLS Next", program: "MLS NEXT", coach: "Coach A", count: 18, retained: 12, lost: 6, gender: "M", fee: 4200, lastYear: 18, newPlayers: 6 },
+            { name: "2013 Boys Academy", program: "Club", coach: "Coach B", count: 16, retained: 10, lost: 6, gender: "M", fee: 3500, lastYear: 16, newPlayers: 6 },
+            { name: "2014 Girls Academy", program: "Club", coach: "Coach C", count: 14, retained: 8, lost: 6, gender: "F", fee: 3500, lastYear: 14, newPlayers: 6 },
           ]);
           setPlayerList([]);
           setLoading(false);
           return;
         }
 
-        const responses = await Promise.all([
+        // [CHANGE #1] Added PROGRAMS_RAW fetch
+        const fetchUrls = [
           fetch(URLS.KPIS_GENDER).then(res => res.text()),
           fetch(URLS.PROGRAMS).then(res => res.text()),
           fetch(URLS.AGE).then(res => res.text()),
           fetch(URLS.TEAMS).then(res => res.text()),
           fetch(URLS.PLAYERS).then(res => res.text()),
-        ]);
+        ];
+        
+        // Add programs_raw if URL exists
+        if (URLS.PROGRAMS_RAW) {
+          fetchUrls.push(fetch(URLS.PROGRAMS_RAW).then(res => res.text()));
+        }
 
-        const [kpiText, progText, ageText, teamText, playerText] = responses;
+        const responses = await Promise.all(fetchUrls);
+        const [kpiText, progText, ageText, teamText, playerText, progRawText] = responses;
 
         // KPIs
         const kpiRows = rowsToObjects(parseCSV(kpiText));
@@ -391,7 +487,21 @@ export default function WayneDashboard({ onLogout }) {
         });
         setKpisGender(kpiMap);
 
-        // Programs with gender columns
+        // [CHANGE #1] Programs Raw - ALL programs
+        if (progRawText) {
+          const progRawRows = rowsToObjects(parseCSV(progRawText));
+          setProgramsRaw(progRawRows.map(r => ({
+            name: pick(r, ["name"]),
+            retained: toNumber(pick(r, ["retained"])),
+            lost: toNumber(pick(r, ["lost"])),
+            lastYear: toNumber(pick(r, ["lastYear"])),
+            thisYear: toNumber(pick(r, ["thisYear"])),
+            retentionRate: toNumber(pick(r, ["retentionRate"])),
+            churn: toNumber(pick(r, ["churn"]))
+          })).filter(p => p.name && p.name.trim() !== ''));
+        }
+
+        // Programs (aggregated by platform)
         const progRows = rowsToObjects(parseCSV(progText));
         setPrograms(progRows.map(r => ({
           name: pick(r, ["name"]),
@@ -403,40 +513,41 @@ export default function WayneDashboard({ onLogout }) {
           lost_girls: toNumber(pick(r, ["lost_girls"]))
         })));
 
-        // Age Diagnostic with gender columns
-        // Age Diagnostic with gender columns
-  
-        // Age Diagnostic with gender columns - FIXED: Proper column reading
-const ageRows = rowsToObjects(parseCSV(ageText));
-setAgeDiag(ageRows.map(r => {
-  const playersLast = toNumber(pick(r, ["playersLast", "Players"]));
-  const playersThis = toNumber(pick(r, ["playersThis"]));
-  const boysLast = toNumber(pick(r, ["boysLast"]));
-  const boysThis = toNumber(pick(r, ["boysThis"]));
-  const girlsLast = toNumber(pick(r, ["girlsLast"]));
-  const girlsThis = toNumber(pick(r, ["girlsThis"]));
-  const rate = normalizePercent(pick(r, ["rate"]));
-  
-  // Calculate gender-specific retention rates
-  const boysRetained = Math.min(boysLast, boysThis);
-  const girlsRetained = Math.min(girlsLast, girlsThis);
-  
-  return {
-    year: String(pick(r, ["year"])),
-    rate: rate,
-    playersLast,
-    playersThis,
-    boysLast,
-    boysThis,
-    girlsLast,
-    girlsThis,
-    boysRate: boysLast > 0 ? Math.round((boysRetained / boysLast) * 100) : 0,
-    girlsRate: girlsLast > 0 ? Math.round((girlsRetained / girlsLast) * 100) : 0,
-    risk: pick(r, ["risk"])
-  };
-}));
+        // [CHANGE #8] Age Diagnostic - sorted from youngest to oldest (2019 → 2007)
+        const ageRows = rowsToObjects(parseCSV(ageText));
+        const ageDiagData = ageRows.map(r => {
+          const playersLast = toNumber(pick(r, ["playersLast", "Players"]));
+          const playersThis = toNumber(pick(r, ["playersThis"]));
+          const boysLast = toNumber(pick(r, ["boysLast"]));
+          const boysThis = toNumber(pick(r, ["boysThis"]));
+          const girlsLast = toNumber(pick(r, ["girlsLast"]));
+          const girlsThis = toNumber(pick(r, ["girlsThis"]));
+          const rate = normalizePercent(pick(r, ["rate"]));
+          
+          // [CHANGE #7] Calculate gender-specific retention rates correctly
+          const boysRetained = toNumber(pick(r, ["boysRetained"])) || Math.min(boysLast, boysThis);
+          const girlsRetained = toNumber(pick(r, ["girlsRetained"])) || Math.min(girlsLast, girlsThis);
+          
+          return {
+            year: String(pick(r, ["year"])),
+            rate: rate,
+            playersLast,
+            playersThis,
+            boysLast,
+            boysThis,
+            girlsLast,
+            girlsThis,
+            boysRate: boysLast > 0 ? Math.round((boysRetained / boysLast) * 100) : 0,
+            girlsRate: girlsLast > 0 ? Math.round((girlsRetained / girlsLast) * 100) : 0,
+            risk: pick(r, ["risk"])
+          };
+        });
+        
+        // [CHANGE #8] Sort by year descending (2019 first, then 2018, etc.)
+        ageDiagData.sort((a, b) => parseInt(b.year) - parseInt(a.year));
+        setAgeDiag(ageDiagData);
 
-        // Teams (25/26 only)
+        // [CHANGE #4] Teams - filter out "Goalkeepers: BOYS"
         const teamRows = rowsToObjects(parseCSV(teamText));
         setTeams(teamRows.map(r => {
           const name = pick(r, ["name"]) || "";
@@ -453,40 +564,36 @@ setAgeDiag(ageRows.map(r => {
             retained: toNumber(pick(r, ["retained"])),
             lost: toNumber(pick(r, ["lost"])),
             gender,
-            fee: toNumber(pick(r, ["Fee"])) || 3000
+            fee: toNumber(pick(r, ["Fee"])) || 3000,
+            // [CHANGE #11] Added lastYear and newPlayers columns
+            lastYear: toNumber(pick(r, ["lastYear", "last_year"])) || toNumber(pick(r, ["count"])),
+            newPlayers: toNumber(pick(r, ["new", "newPlayers", "new_players"])) || 0
           };
-        }));
+        }).filter(t => !t.name.toLowerCase().includes("goalkeeper"))); // [CHANGE #4] Filter out goalkeepers
 
-        // Players
-       // Players
+        // Players - [CHANGE #10] Include individual fee for exact revenue calculation
         const playerRows = rowsToObjects(parseCSV(playerText));
         setPlayerList(playerRows.map(r => {
           let status = pick(r, ["status"]) || "Unknown";
           const agedOutVal = pick(r, ["aged_out"]);
           const isAgedOut = agedOutVal === 'Y' || agedOutVal === 'Yes';
           
-          // --- MEJORA: DETECCIÓN DE GÉNERO UNIVERSAL ---
           let genderRaw = pick(r, ["gender"]) || "";
-          let gender = "M"; // Por defecto (si falla todo)
-          
+          let gender = "M";
           const g = genderRaw.toLowerCase().trim();
-          
-          // Entiende cualquier variante
           if (g === 'f' || g === 'female' || g === 'girl' || g === 'girls' || g === 'mujer') {
             gender = "F";
-          } else {
-            // Asumimos Masculino para 'm', 'male', 'boy', 'boys' o vacío
-            gender = "M";
           }
-          // ---------------------------------------------
 
           return {
             name: `${pick(r, ["first_name"])} ${pick(r, ["last_name"])}`.trim(),
             status,
             teamLast: pick(r, ["Team (Last Yr)"]),
             teamThis: pick(r, ["Team (This Yr)"]),
-            gender, // Aquí ya va limpio como "M" o "F"
-            agedOut: isAgedOut
+            gender,
+            agedOut: isAgedOut,
+            // [CHANGE #10] Individual fee for exact revenue calculation
+            fee: toNumber(pick(r, ["fee_last", "fee"])) || 0
           };
         }));
 
@@ -512,23 +619,20 @@ setAgeDiag(ageRows.map(r => {
   const eligibleRetentionPercent = eligibleBase > 0 ? Math.round((activeData.retained / eligibleBase) * 100) : 0;
   const changePercent = activeData.totalLast > 0 ? Math.round(((activeData.totalThis - activeData.totalLast) / activeData.totalLast) * 100) : 0;
 
-  // FILTERED Programs
-  const filteredPrograms = useMemo(() => {
-    return programs.map(p => {
-      if (genderFilter === 'club') {
-        const total = p.retained + p.lost;
-        return { ...p, displayRetained: p.retained, displayLost: p.lost, displayRate: total > 0 ? Math.round((p.retained / total) * 100) : 0 };
-      } else if (genderFilter === 'boys') {
-        const total = p.retained_boys + p.lost_boys;
-        return { ...p, displayRetained: p.retained_boys, displayLost: p.lost_boys, displayRate: total > 0 ? Math.round((p.retained_boys / total) * 100) : 0 };
-      } else {
-        const total = p.retained_girls + p.lost_girls;
-        return { ...p, displayRetained: p.retained_girls, displayLost: p.lost_girls, displayRate: total > 0 ? Math.round((p.retained_girls / total) * 100) : 0 };
-      }
+  // [CHANGE #1] Use programsRaw for the chart (ALL programs)
+  const filteredProgramsRaw = useMemo(() => {
+    return programsRaw.map(p => {
+      const total = p.retained + p.lost;
+      return { 
+        ...p, 
+        displayRetained: p.retained, 
+        displayLost: p.lost, 
+        displayRate: total > 0 ? Math.round((p.retained / total) * 100) : p.retentionRate || 0 
+      };
     }).filter(p => p.displayRetained > 0 || p.displayLost > 0);
-  }, [programs, genderFilter]);
+  }, [programsRaw]);
 
-  // FILTERED Age Diagnostic - FIXED: Shows different data for boys/girls
+  // [CHANGE #7] FIXED: Age Diagnostic with correct gender-specific rates
   const filteredAgeDiag = useMemo(() => {
     return ageDiag.map(a => {
       if (genderFilter === 'club') {
@@ -543,51 +647,60 @@ setAgeDiag(ageRows.map(r => {
           ...a, 
           displayLast: a.boysLast, 
           displayThis: a.boysThis, 
-          displayRate: a.boysRate || (a.boysLast > 0 ? Math.round((Math.min(a.boysThis, a.boysLast) / a.boysLast) * 100) : 0)
+          displayRate: a.boysRate
         };
       } else {
         return { 
           ...a, 
           displayLast: a.girlsLast, 
           displayThis: a.girlsThis, 
-          displayRate: a.girlsRate || (a.girlsLast > 0 ? Math.round((Math.min(a.girlsThis, a.girlsLast) / a.girlsLast) * 100) : 0)
+          displayRate: a.girlsRate
         };
       }
     });
   }, [ageDiag, genderFilter]);
 
-  // Age comparison data - ESTE ES EL NUEVO BLOQUE CORREGIDO
-  // FIXED: Age comparison data with proper gender filtering
+  // [CHANGE #7 & #8] Age comparison data with correct gender filtering and sorting
   const ageComparisonData = useMemo(() => {
-  return ageDiag.map(a => {
-    let pLast, pThis, displayRate;
-    
-    if (genderFilter === 'club') {
-      pLast = a.playersLast;
-      pThis = a.playersThis;
-      displayRate = a.rate;
-    } else if (genderFilter === 'boys') {
-      pLast = a.boysLast;
-      pThis = a.boysThis;
-      displayRate = a.boysLast > 0 ? Math.round((Math.min(a.boysThis, a.boysLast) / a.boysLast) * 100) : 0;
-    } else {
-      pLast = a.girlsLast;
-      pThis = a.girlsThis;
-      displayRate = a.girlsLast > 0 ? Math.round((Math.min(a.girlsThis, a.girlsLast) / a.girlsLast) * 100) : 0;
-    }
+    return ageDiag.map(a => {
+      let pLast, pThis, displayRate;
+      
+      if (genderFilter === 'club') {
+        pLast = a.playersLast;
+        pThis = a.playersThis;
+        displayRate = a.rate;
+      } else if (genderFilter === 'boys') {
+        pLast = a.boysLast;
+        pThis = a.boysThis;
+        displayRate = a.boysRate;
+      } else {
+        pLast = a.girlsLast;
+        pThis = a.girlsThis;
+        displayRate = a.girlsRate;
+      }
 
-    return {
-      year: a.year,
-      playersLast: pLast,
-      playersThis: pThis,
-      rate: displayRate,
-      change: pLast > 0 ? Math.round(((pThis - pLast) / pLast) * 100) : 0,
-      risk: a.risk
-    };
-  }).filter(a => a.playersLast > 0 || a.playersThis > 0);
-}, [ageDiag, genderFilter]);
+      return {
+        year: a.year,
+        playersLast: pLast,
+        playersThis: pThis,
+        rate: displayRate,
+        change: pLast > 0 ? Math.round(((pThis - pLast) / pLast) * 100) : 0,
+        risk: a.risk
+      };
+    }).filter(a => a.playersLast > 0 || a.playersThis > 0);
+    // Already sorted by year desc in useEffect
+  }, [ageDiag, genderFilter]);
 
-  // Filter teams by gender - FIXED
+  // [CHANGE #9] Separate positive and negative age groups
+  const positiveAgeGroups = useMemo(() => {
+    return ageComparisonData.filter(a => a.change > 0).slice(0, 3);
+  }, [ageComparisonData]);
+
+  const negativeAgeGroups = useMemo(() => {
+    return ageComparisonData.filter(a => a.change < 0).sort((a, b) => a.change - b.change).slice(0, 3);
+  }, [ageComparisonData]);
+
+  // [CHANGE #4] Filter teams - exclude goalkeepers
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return teams.filter((t) => {
@@ -595,14 +708,45 @@ setAgeDiag(ageRows.map(r => {
       let matchesGender = true;
       if (genderFilter === 'boys') matchesGender = t.gender === 'M';
       else if (genderFilter === 'girls') matchesGender = t.gender === 'F';
-      return matchesSearch && matchesGender;
+      // [CHANGE #4] Already filtered in useEffect, but double-check here
+      const isNotGoalkeeper = !t.name.toLowerCase().includes("goalkeeper");
+      return matchesSearch && matchesGender && isNotGoalkeeper;
     });
   }, [teams, searchTerm, genderFilter]);
 
-  // Revenue - calculated from filtered teams
+  // [CHANGE #10] Calculate EXACT revenue from individual player fees
   const exactRevenueLost = useMemo(() => {
+    // First try to calculate from individual player fees
+    const lostPlayers = playerList.filter(p => {
+      const isLost = p.status === 'Lost' && !p.agedOut;
+      if (genderFilter === 'boys') return isLost && p.gender === 'M';
+      if (genderFilter === 'girls') return isLost && p.gender === 'F';
+      return isLost;
+    });
+    
+    const exactTotal = lostPlayers.reduce((total, p) => total + (p.fee || 0), 0);
+    
+    // If we have exact fees, use them; otherwise fall back to team calculation
+    if (exactTotal > 0) return exactTotal;
+    
+    // Fallback to team-based calculation
     return filteredTeams.reduce((total, team) => total + (team.lost * team.fee), 0);
-  }, [filteredTeams]);
+  }, [playerList, filteredTeams, genderFilter]);
+
+  // [CHANGE #10] Calculate exact NEW revenue
+  const exactNewRevenue = useMemo(() => {
+    const newPlayers = playerList.filter(p => {
+      const isNew = p.status === 'New';
+      if (genderFilter === 'boys') return isNew && p.gender === 'M';
+      if (genderFilter === 'girls') return isNew && p.gender === 'F';
+      return isNew;
+    });
+    
+    const exactTotal = newPlayers.reduce((total, p) => total + (p.fee || activeData.fee), 0);
+    
+    if (exactTotal > 0) return exactTotal;
+    return activeData.new * activeData.fee;
+  }, [playerList, activeData, genderFilter]);
 
   const displayRevenueLost = exactRevenueLost > 0 ? exactRevenueLost : (lostExcludingAgedOut * activeData.fee);
   const potentialRecovery = Math.round(displayRevenueLost * 0.3);
@@ -626,7 +770,7 @@ setAgeDiag(ageRows.map(r => {
     ];
   }, [kpisGender]);
 
-  // COACH STATS - FOCUS ON REVENUE LOST ONLY (No positive "saved" metrics)
+  // Coach Stats
   const coachStats = useMemo(() => {
     if (filteredTeams.length === 0) return { coaches: [], totalRevenueLost: 0, avgFee: 3000 };
     
@@ -645,7 +789,6 @@ setAgeDiag(ageRows.map(r => {
       coachMap[coachName].revenueLost += t.lost * t.fee;
     });
     
-    // Sort by revenue lost (highest first) - focus on the problem
     const coaches = Object.values(coachMap).map(coach => {
       const total = coach.retained + coach.lost;
       return { 
@@ -674,6 +817,9 @@ setAgeDiag(ageRows.map(r => {
     const totalRet = relevantTeams.reduce((acc, curr) => acc + curr.retained, 0);
     const totalCount = relevantTeams.reduce((acc, curr) => acc + curr.count, 0);
     const lostRevenue = relevantTeams.reduce((acc, curr) => acc + (curr.lost * curr.fee), 0);
+    // [CHANGE #11] Added lastYear and newPlayers totals
+    const totalLastYear = relevantTeams.reduce((acc, curr) => acc + (curr.lastYear || curr.count), 0);
+    const totalNew = relevantTeams.reduce((acc, curr) => acc + (curr.newPlayers || 0), 0);
     return {
       name: selectedEntity.id,
       teams: relevantTeams,
@@ -681,33 +827,80 @@ setAgeDiag(ageRows.map(r => {
       totalRetained: totalRet,
       totalLost,
       totalPlayers: totalCount,
-      lostRevenue
+      lostRevenue,
+      totalLastYear,
+      totalNew
     };
   }, [selectedEntity, filteredTeams]);
 
   const uniqueCoaches = useMemo(() => [...new Set(filteredTeams.map(t => t.coach).filter(c => c && c !== "Unassigned"))].sort(), [filteredTeams]);
   const uniqueTeams = useMemo(() => [...new Set(filteredTeams.map(t => t.name))].sort(), [filteredTeams]);
 
+  // [CHANGE #5] Fixed handleOpenPlayerList to actually show players
   const handleOpenPlayerList = (filter, title) => {
-    let matchedPlayers = typeof filter === 'string' 
-      ? playerList.filter(p => p.status === filter)
-      : playerList.filter(p => (p.teamLast === filter.team || p.teamThis === filter.team) && p.status === filter.status);
+    let matchedPlayers = [];
     
-    if (filter === 'Lost' || filter.status === 'Lost') matchedPlayers = matchedPlayers.filter(p => !p.agedOut);
-    if (genderFilter === 'boys') matchedPlayers = matchedPlayers.filter(p => p.gender === 'M');
-    else if (genderFilter === 'girls') matchedPlayers = matchedPlayers.filter(p => p.gender === 'F');
+    if (typeof filter === 'string') {
+      // Simple status filter
+      matchedPlayers = playerList.filter(p => p.status === filter);
+    } else if (filter.status) {
+      // Filter by team AND status
+      matchedPlayers = playerList.filter(p => {
+        const matchesTeam = p.teamLast === filter.team || p.teamThis === filter.team;
+        const matchesStatus = p.status === filter.status;
+        return matchesTeam && matchesStatus;
+      });
+    }
+    
+    // Exclude aged out for Lost
+    if (filter === 'Lost' || filter.status === 'Lost') {
+      matchedPlayers = matchedPlayers.filter(p => !p.agedOut);
+    }
+    
+    // Apply gender filter
+    if (genderFilter === 'boys') {
+      matchedPlayers = matchedPlayers.filter(p => p.gender === 'M');
+    } else if (genderFilter === 'girls') {
+      matchedPlayers = matchedPlayers.filter(p => p.gender === 'F');
+    }
 
     setModal({
       open: true,
       title,
-      players: matchedPlayers.map(p => ({ ...p, team: p.teamLast || p.teamThis, gender: p.gender === 'M' ? 'Boys' : 'Girls' })),
+      players: matchedPlayers.map(p => ({ 
+        ...p, 
+        team: p.teamLast || p.teamThis, 
+        gender: p.gender === 'M' ? 'Boys' : 'Girls' 
+      })),
       subtitle: `${genderFilter !== 'club' ? genderFilter.charAt(0).toUpperCase() + genderFilter.slice(1) + ' - ' : ''}${matchedPlayers.length} players`
     });
   };
 
+  // [CHANGE #6] Export only Lost Players from header button
+  const handleExportLostPlayers = () => {
+    let lostPlayers = playerList.filter(p => p.status === 'Lost' && !p.agedOut);
+    
+    // Apply gender filter
+    if (genderFilter === 'boys') {
+      lostPlayers = lostPlayers.filter(p => p.gender === 'M');
+    } else if (genderFilter === 'girls') {
+      lostPlayers = lostPlayers.filter(p => p.gender === 'F');
+    }
+    
+    const data = lostPlayers.map(p => ({
+      Name: p.name,
+      Gender: p.gender === 'M' ? 'Boys' : 'Girls',
+      'Team (Last Year)': p.teamLast || '',
+      Fee: p.fee ? `$${p.fee.toLocaleString()}` : 'N/A',
+      Status: 'Lost'
+    }));
+    
+    exportToExcel(data, `Lost_Players_${genderFilter}`, 'Lost Players');
+  };
+
   const handleExportAll = () => {
     const lostPlayers = playerList.filter(p => p.status === 'Lost' && !p.agedOut).map(p => ({
-      Name: p.name, Gender: p.gender === 'M' ? 'Boys' : 'Girls', 'Team (Last Year)': p.teamLast, Status: 'Lost'
+      Name: p.name, Gender: p.gender === 'M' ? 'Boys' : 'Girls', 'Team (Last Year)': p.teamLast, Fee: p.fee ? `$${p.fee}` : 'N/A', Status: 'Lost'
     }));
     const retainedPlayers = playerList.filter(p => p.status === 'Retained').map(p => ({
       Name: p.name, Gender: p.gender === 'M' ? 'Boys' : 'Girls', 'Team (Last Year)': p.teamLast, 'Team (This Year)': p.teamThis, Status: 'Retained'
@@ -717,7 +910,10 @@ setAgeDiag(ageRows.map(r => {
     }));
     const teamsSummary = filteredTeams.map(t => ({
       Team: t.name, Program: t.program, Coach: t.coach, Gender: t.gender === 'M' ? 'Boys' : 'Girls',
-      'Total Players': t.count, Retained: t.retained, Lost: t.lost,
+      'Last Year': t.lastYear || t.count, // [CHANGE #11]
+      'This Year': t.count,
+      'New Players': t.newPlayers || 0, // [CHANGE #11]
+      Retained: t.retained, Lost: t.lost,
       'Retention Rate': `${(t.retained + t.lost) > 0 ? Math.round((t.retained / (t.retained + t.lost)) * 100) : 0}%`,
       Fee: `$${t.fee}`, 'Revenue Lost': `$${(t.lost * t.fee).toLocaleString()}`
     }));
@@ -729,7 +925,6 @@ setAgeDiag(ageRows.map(r => {
     ], 'RetainPlayers_Export');
   };
 
-  // Export handlers - FIXED: All export to Excel
   const handleExportTeamsRevenue = () => {
     const data = filteredTeams
       .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
@@ -739,6 +934,9 @@ setAgeDiag(ageRows.map(r => {
         'Program': t.program,
         'Coach': t.coach,
         'Gender': t.gender === 'M' ? 'Boys' : 'Girls',
+        'Last Year': t.lastYear || t.count, // [CHANGE #11]
+        'This Year': t.count,
+        'New Players': t.newPlayers || 0, // [CHANGE #11]
         'Players Lost': t.lost,
         'Fee per Player': `$${t.fee.toLocaleString()}`,
         'Revenue Lost': `$${(t.lost * t.fee).toLocaleString()}`
@@ -789,19 +987,28 @@ setAgeDiag(ageRows.map(r => {
 
           <div className="flex flex-col items-end gap-3">
             <div className="flex items-center gap-3">
+              {/* [CHANGE #6] Export button now only exports Lost Players */}
+              <button onClick={handleExportLostPlayers} className="flex items-center gap-2 px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 rounded-lg text-xs font-bold text-rose-300 transition-colors">
+                <FileSpreadsheet size={14} /> Export Lost Players
+              </button>
               <button onClick={handleExportAll} className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors">
-                <FileSpreadsheet size={14} /> Export Excel
+                <FileSpreadsheet size={14} /> Export All
               </button>
               <button onClick={handleLogout} className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors">
                 <LogOut size={14} /> Logout
               </button>
             </div>
 
+            {/* [CHANGE #3] Gender filter with consistent colors */}
             <div className="flex bg-[#111827] p-1 rounded-xl border border-slate-700/50">
-              {[{ id: "club", label: "Club", icon: ShieldCheck }, { id: "boys", label: "Boys", icon: Users }, { id: "girls", label: "Girls", icon: Award }].map((item) => (
+              {[{ id: "club", label: "Club", icon: ShieldCheck, color: "blue" }, 
+                { id: "boys", label: "Boys", icon: Users, color: "blue" }, 
+                { id: "girls", label: "Girls", icon: Award, color: "pink" }].map((item) => (
                 <button key={item.id} onClick={() => setGenderFilter(item.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                    genderFilter === item.id ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+                    genderFilter === item.id 
+                      ? item.color === "pink" ? "bg-pink-600 text-white" : "bg-blue-600 text-white"
+                      : "text-slate-400 hover:text-white"
                   }`}>
                   <item.icon size={14} />{item.label}
                 </button>
@@ -833,41 +1040,48 @@ setAgeDiag(ageRows.map(r => {
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
-              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" />
+              {/* [CHANGE #3] Use gender-consistent color */}
+              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass={genderFilter === 'girls' ? "text-pink-400" : "text-blue-400"} />
               <Scorecard label="Net Change" value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} 
                 sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`} highlight />
             </div>
 
+            {/* [CHANGE #5] KPI boxes with proper onClick handlers */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <KPIBox title="Retained" value={activeData.retained.toLocaleString()} sub="Stayed from last season"
                 percent={`${retentionPercent}%`} icon={UserCheck} color="bg-blue-600" trend="up" clickable 
-                onClick={() => handleOpenPlayerList({ status: 'Retained' }, 'Retained Players')} />
+                onClick={() => handleOpenPlayerList('Retained', 'Retained Players')} genderFilter={genderFilter} />
               <KPIBox title="Lost (Churn)" value={lostExcludingAgedOut.toLocaleString()} sub="Did not return (excl. aged out)"
                 percent={`${churnPercent}%`} icon={UserMinus} color="bg-rose-500" trend="down" 
-                tooltip="Excludes players who aged out" clickable onClick={() => handleOpenPlayerList({ status: 'Lost' }, 'Lost Players')} />
+                tooltip="Excludes players who aged out" clickable onClick={() => handleOpenPlayerList('Lost', 'Lost Players')} genderFilter={genderFilter} />
               <KPIBox title="New Players" value={activeData.new.toLocaleString()} sub="First time this season"
-                icon={UserPlus} color="bg-emerald-600" trend="up" clickable onClick={() => handleOpenPlayerList({ status: 'New' }, 'New Players')} />
+                icon={UserPlus} color="bg-emerald-600" trend="up" clickable onClick={() => handleOpenPlayerList('New', 'New Players')} genderFilter={genderFilter} />
               <KPIBox title="Eligible Retention" value={`${eligibleRetentionPercent}%`} 
                 sub={`Retained ÷ (${activeData.totalLast} - ${agedOut} aged out)`} icon={Target} color="bg-indigo-600" 
-                tooltip="Retention rate excluding aged out" />
+                tooltip="Retention rate excluding aged out" genderFilter={genderFilter} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+              {/* [CHANGE #1 & #2] Use programsRaw and change title to "RETENTION BY PROGRAM" */}
               <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50 lg:col-span-2">
                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <ClipboardList size={18} className="text-blue-400" />Retention by Platform
-                  {genderFilter !== 'club' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg ml-2">{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                  <ClipboardList size={18} className={genderFilter === 'girls' ? "text-pink-400" : "text-blue-400"} />
+                  {/* [CHANGE #2] Changed from "Platform" to "Program" */}
+                  Retention by Program
+                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'girls' ? 'bg-pink-500/20 text-pink-400' : 'bg-blue-500/20 text-blue-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={filteredPrograms} margin={{ left: 0, right: 20 }}>
+                    {/* [CHANGE #1] Use filteredProgramsRaw instead of filteredPrograms */}
+                    <ComposedChart data={filteredProgramsRaw} margin={{ left: 0, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
                       <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                       <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                      <Bar yAxisId="left" dataKey="displayRetained" name="Retained" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      {/* [CHANGE #3] Use gender-consistent colors */}
+                      <Bar yAxisId="left" dataKey="displayRetained" name="Retained" fill={currentColors.primary} radius={[4, 4, 0, 0]} />
                       <Bar yAxisId="left" dataKey="displayLost" name="Lost" fill="#475569" radius={[4, 4, 0, 0]} />
                       <Line yAxisId="right" type="monotone" dataKey="displayRate" name="Retention %" stroke="#10b981" strokeWidth={3} dot={{ r: 5, fill: "#10b981" }} />
                     </ComposedChart>
@@ -918,24 +1132,25 @@ setAgeDiag(ageRows.map(r => {
           </>
         )}
 
-        {/* DIAGNOSIS - FIXED: Different data for Boys/Girls */}
+        {/* DIAGNOSIS - [CHANGE #7, #8, #9] Fixed gender rates, sorted ages, added positive cards */}
         {activeTab === "diagnosis" && (
           <div className="space-y-6">
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-               Retention by Age Group
-              {genderFilter !== 'club' && (
-              <span className={`text-xs px-2 py-1 rounded-lg ${
-               genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'
-              }`}>
-                {genderFilter === 'boys' ? '♂ Boys' : '♀ Girls'} only
-              </span>
+                Retention by Age Group
+                {genderFilter !== 'club' && (
+                  <span className={`text-xs px-2 py-1 rounded-lg ${
+                    genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'
+                  }`}>
+                    {genderFilter === 'boys' ? '♂ Boys' : '♀ Girls'} only
+                  </span>
                 )}
               </h4>
               <p className="text-slate-400 text-sm mb-6">
-                {genderFilter === 'club' ? 'Compare player counts year over year by birth year' : 
-                 genderFilter === 'boys' ? 'Boys player counts year over year by birth year' : 
-                 'Girls player counts year over year by birth year'}
+                {/* [CHANGE #8] Note about sorting */}
+                Sorted from youngest (2019) to oldest (2007) • 
+                {genderFilter === 'club' ? ' All players' : 
+                 genderFilter === 'boys' ? ' Boys only' : ' Girls only'}
               </p>
               <div className="h-[380px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -947,22 +1162,49 @@ setAgeDiag(ageRows.map(r => {
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ color: '#94a3b8' }} />
                     <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill={genderFilter === 'girls' ? '#ec4899' : '#3b82f6'} radius={[4, 4, 0, 0]} />
+                    {/* [CHANGE #3] Use gender-consistent color */}
+                    <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill={currentColors.primary} radius={[4, 4, 0, 0]} />
                     <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {ageComparisonData.slice(0, 6).map((a, idx) => (
-                <div key={idx} className="bg-[#111827] rounded-xl p-4 text-center border border-slate-700/50">
-                  <p className="text-white font-bold text-lg">{a.year}</p>
-                  <p className="text-slate-400 text-sm">{a.playersLast} → {a.playersThis}</p>
-                  <p className={`text-lg font-bold ${a.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{a.change >= 0 ? '+' : ''}{a.change}%</p>
+            {/* [CHANGE #9] Added POSITIVE age groups (green cards) */}
+            {positiveAgeGroups.length > 0 && (
+              <div>
+                <h5 className="text-sm font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <TrendingUp size={16} /> Growing Age Groups
+                </h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
+                  {positiveAgeGroups.map((a, idx) => (
+                    <div key={idx} className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-center">
+                      <p className="text-white font-bold text-lg">{a.year}</p>
+                      <p className="text-slate-400 text-sm">{a.playersLast} → {a.playersThis}</p>
+                      <p className="text-lg font-bold text-emerald-400">+{a.change}%</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {/* Negative age groups (red cards) */}
+            {negativeAgeGroups.length > 0 && (
+              <div>
+                <h5 className="text-sm font-bold text-rose-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <TrendingDown size={16} /> Declining Age Groups
+                </h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3">
+                  {negativeAgeGroups.map((a, idx) => (
+                    <div key={idx} className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 text-center">
+                      <p className="text-white font-bold text-lg">{a.year}</p>
+                      <p className="text-slate-400 text-sm">{a.playersLast} → {a.playersThis}</p>
+                      <p className="text-lg font-bold text-rose-400">{a.change}%</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 border border-rose-500/30 p-5 rounded-2xl">
@@ -984,25 +1226,24 @@ setAgeDiag(ageRows.map(r => {
           </div>
         )}
 
-        {/* FINANCIALS - Only shows losses, no positive "saved" metrics */}
+        {/* FINANCIALS - [CHANGE #10] Uses exact revenue calculation */}
         {activeTab === "financials" && (
           <div className="space-y-6">
-            {/* Header Card: Revenue Lost to Churn */}
             <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-8 rounded-2xl shadow-lg shadow-rose-500/20">
               <div className="flex items-center gap-5">
                 <div className="bg-white/20 p-4 rounded-2xl"><DollarSign size={36} className="text-white" /></div>
                 <div>
                   <p className="text-rose-200 text-xs font-bold uppercase tracking-wider mb-1">Revenue Lost to Churn</p>
                   <h3 className="text-5xl font-black text-white">${displayRevenueLost.toLocaleString()}</h3>
-                  <p className="text-rose-200 text-sm mt-1">{lostExcludingAgedOut} players × ${activeData.fee.toLocaleString()} avg fee</p>
+                  {/* [CHANGE #10] Show if using exact or estimated */}
+                  <p className="text-rose-200 text-sm mt-1">
+                    {exactRevenueLost > 0 ? 'Calculated from individual player fees' : `${lostExcludingAgedOut} players × $${activeData.fee.toLocaleString()} avg fee`}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* KPI Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Card 1: Lost Revenue */}
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-rose-500/20 rounded-xl"><UserMinus className="text-rose-400" size={20} /></div>
@@ -1014,30 +1255,25 @@ setAgeDiag(ageRows.map(r => {
                 <p className="text-sm text-slate-500">From {lostExcludingAgedOut} players who didn't return</p>
               </div>
 
-              {/* Card 2: New Revenue */}
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-emerald-500/20 rounded-xl"><UserPlus className="text-emerald-400" size={20} /></div>
                   <div>
                     <p className="text-xs font-bold text-slate-500 uppercase">New Revenue</p>
-                    {/* Aquí usamos el cálculo exacto si está disponible (exactNewRevenue), o el aproximado corregido */}
-                    <p className="text-2xl font-black text-emerald-400">
-                      +${(typeof exactNewRevenue !== 'undefined' ? exactNewRevenue : Math.round(activeData.new * activeData.fee)).toLocaleString()}
-                    </p>
+                    {/* [CHANGE #10] Use exact new revenue */}
+                    <p className="text-2xl font-black text-emerald-400">+${exactNewRevenue.toLocaleString()}</p>
                   </div>
                 </div>
                 <p className="text-sm text-slate-500">From {activeData.new} new players</p>
               </div>
 
-              {/* Card 3: Net Impact */}
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2.5 bg-blue-500/20 rounded-xl"><Target className="text-blue-400" size={20} /></div>
                   <div>
                     <p className="text-xs font-bold text-slate-500 uppercase">Net Impact</p>
                     {(() => {
-                      const newRevenue = typeof exactNewRevenue !== 'undefined' ? exactNewRevenue : Math.round(activeData.new * activeData.fee);
-                      const netImpact = newRevenue - displayRevenueLost;
+                      const netImpact = exactNewRevenue - displayRevenueLost;
                       return (
                         <p className={`text-2xl font-black ${netImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {netImpact >= 0 ? '+' : ''}${netImpact.toLocaleString()}
@@ -1050,7 +1286,6 @@ setAgeDiag(ageRows.map(r => {
               </div>
             </div>
 
-            {/* Recovery Opportunity Section */}
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-lg shadow-emerald-500/20">
               <div className="flex flex-col md:flex-row items-center justify-between gap-5">
                 <div>
@@ -1069,14 +1304,10 @@ setAgeDiag(ageRows.map(r => {
               </div>
             </div>
 
-            {/* Top Revenue Losses Table */}
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-bold text-white">Top Revenue Losses by Team</h4>
-                <button 
-                  onClick={handleExportTeamsRevenue}
-                  className="text-xs text-blue-400 flex items-center gap-1 hover:text-blue-300 bg-blue-500/10 px-3 py-2 rounded-lg"
-                >
+                <button onClick={handleExportTeamsRevenue} className="text-xs text-blue-400 flex items-center gap-1 hover:text-blue-300 bg-blue-500/10 px-3 py-2 rounded-lg">
                   <FileSpreadsheet size={14} /> Export Excel
                 </button>
               </div>
@@ -1098,14 +1329,14 @@ setAgeDiag(ageRows.map(r => {
           </div>
         )}
 
-        {/* TEAMS - FIXED: Works with Boys/Girls filter */}
+        {/* TEAMS - [CHANGE #4, #11] Filtered goalkeepers, added Last Year and New columns */}
         {activeTab === "full-roster" && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
                 <h4 className="text-xl font-bold text-white flex items-center gap-2">
                   Current Teams (25/26)
-                  {genderFilter !== 'club' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg">{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ${genderFilter === 'girls' ? 'bg-pink-500/20 text-pink-400' : 'bg-blue-500/20 text-blue-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
                 <p className="text-slate-400 text-sm">Click on numbers to see player lists • {filteredTeams.length} teams</p>
               </div>
@@ -1118,7 +1349,10 @@ setAgeDiag(ageRows.map(r => {
                 <button 
                   onClick={() => exportToExcel(filteredTeams.map(t => ({ 
                     Team: t.name, Program: t.program, Coach: t.coach, Gender: t.gender === 'M' ? 'Boys' : 'Girls',
-                    Players: t.count, Retained: t.retained, Lost: t.lost, 
+                    'Last Year': t.lastYear || t.count, // [CHANGE #11]
+                    'This Year': t.count,
+                    'New': t.newPlayers || 0, // [CHANGE #11]
+                    Retained: t.retained, Lost: t.lost, 
                     'Retention Rate': `${(t.retained + t.lost) > 0 ? Math.round((t.retained / (t.retained + t.lost)) * 100) : 0}%`, 
                     Fee: `$${t.fee}`, 'Revenue Lost': `$${(t.lost * t.fee).toLocaleString()}` 
                   })), 'Teams_Export', 'Teams')}
@@ -1141,7 +1375,11 @@ setAgeDiag(ageRows.map(r => {
                     <tr className="border-b border-slate-700/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
                       <th className="pb-3 pr-4">Team</th>
                       <th className="pb-3 pr-4">Coach</th>
-                      <th className="pb-3 text-center">Players</th>
+                      {/* [CHANGE #11] Added Last Year column */}
+                      <th className="pb-3 text-center">Last Yr</th>
+                      <th className="pb-3 text-center">This Yr</th>
+                      {/* [CHANGE #11] Added New column */}
+                      <th className="pb-3 text-center">New</th>
                       <th className="pb-3 text-center">Retained</th>
                       <th className="pb-3 text-center">Lost</th>
                       <th className="pb-3 text-center">Rate</th>
@@ -1156,12 +1394,16 @@ setAgeDiag(ageRows.map(r => {
                         <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                           <td className="py-4 pr-4">
                             <div className="font-bold text-white">{team.name}</div>
-                            <div className="text-xs text-blue-400">{team.program}</div>
+                            <div className={`text-xs ${genderFilter === 'girls' ? 'text-pink-400' : 'text-blue-400'}`}>{team.program}</div>
                           </td>
                           <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
+                          {/* [CHANGE #11] Last Year column */}
+                          <td className="py-4 text-center text-slate-500">{team.lastYear || team.count}</td>
                           <td className="py-4 text-center text-slate-400">{team.count}</td>
+                          {/* [CHANGE #11] New column */}
+                          <td className="py-4 text-center text-emerald-400 font-bold">{team.newPlayers || 0}</td>
                           <td className="py-4 text-center">
-                            <button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)} className="text-blue-400 font-bold hover:underline">{team.retained}</button>
+                            <button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)} className={`font-bold hover:underline ${genderFilter === 'girls' ? 'text-pink-400' : 'text-blue-400'}`}>{team.retained}</button>
                           </td>
                           <td className="py-4 text-center">
                             <button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Lost' }, `Lost: ${team.name}`)} className="text-rose-400 font-bold hover:underline">{team.lost}</button>
@@ -1180,10 +1422,9 @@ setAgeDiag(ageRows.map(r => {
           </div>
         )}
 
-        {/* COACHES - FOCUS ON REVENUE LOST (No positive metrics) */}
+        {/* COACHES */}
         {activeTab === "coaches" && (
           <div className="space-y-6">
-            {/* Header Stats - Only showing losses */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 p-5 rounded-2xl border border-rose-500/30">
                 <p className="text-xs font-bold text-rose-400 uppercase tracking-wider mb-1">Total Revenue Lost</p>
@@ -1202,21 +1443,17 @@ setAgeDiag(ageRows.map(r => {
               </div>
             </div>
 
-            {/* Coach Table - Sorted by Revenue Lost */}
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h4 className="text-xl font-bold text-white flex items-center gap-2">
                     <DollarSign size={20} className="text-rose-400" />
                     Revenue Lost by Coach
-                    {genderFilter !== 'club' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg ml-2">{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                    {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'girls' ? 'bg-pink-500/20 text-pink-400' : 'bg-blue-500/20 text-blue-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                   </h4>
                   <p className="text-slate-400 text-sm">Ranked by revenue lost • Click coach name for details</p>
                 </div>
-                <button 
-                  onClick={handleExportCoaches}
-                  className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
-                >
+                <button onClick={handleExportCoaches} className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors">
                   <FileSpreadsheet size={14} /> Export Excel
                 </button>
               </div>
@@ -1260,7 +1497,6 @@ setAgeDiag(ageRows.map(r => {
               </div>
             </div>
 
-            {/* Insight Cards - Focus on problems, not heroes */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 border border-rose-500/30 p-5 rounded-2xl">
                 <DollarSign className="text-rose-400 mb-3" size={24} />
@@ -1281,13 +1517,13 @@ setAgeDiag(ageRows.map(r => {
           </div>
         )}
 
-        {/* DEEP DIVE */}
+        {/* DEEP DIVE - [CHANGE #11] Added Last Year and New columns */}
         {activeTab === "deep-dive" && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <div className="lg:col-span-1 bg-[#111827] p-5 rounded-2xl border border-slate-700/50 h-fit">
               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
                 Select Focus (25/26 Only)
-                {genderFilter !== 'club' && <span className="block text-blue-400 mt-1">{genderFilter === 'boys' ? 'Boys' : 'Girls'} teams only</span>}
+                {genderFilter !== 'club' && <span className={`block mt-1 ${genderFilter === 'girls' ? 'text-pink-400' : 'text-blue-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} teams only</span>}
               </h4>
               <div className="space-y-4">
                 <div>
@@ -1329,6 +1565,16 @@ setAgeDiag(ageRows.map(r => {
                           <p className="text-xs text-slate-500 font-bold uppercase mb-1">Retention</p>
                           <p className={`text-2xl font-black ${deepDiveStats.retentionRate >= 70 ? 'text-emerald-400' : deepDiveStats.retentionRate >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>{deepDiveStats.retentionRate}%</p>
                         </div>
+                        {/* [CHANGE #11] Added Last Year stat */}
+                        <div className="text-center">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-1">Last Yr</p>
+                          <p className="text-2xl font-black text-slate-400">{deepDiveStats.totalLastYear}</p>
+                        </div>
+                        {/* [CHANGE #11] Added New stat */}
+                        <div className="text-center">
+                          <p className="text-xs text-slate-500 font-bold uppercase mb-1">New</p>
+                          <p className="text-2xl font-black text-emerald-400">{deepDiveStats.totalNew}</p>
+                        </div>
                         <div className="text-center">
                           <p className="text-xs text-slate-500 font-bold uppercase mb-1">Lost</p>
                           <p className="text-2xl font-black text-rose-400">{deepDiveStats.totalLost}</p>
@@ -1355,9 +1601,19 @@ setAgeDiag(ageRows.map(r => {
                             <span className={`px-2.5 py-1 rounded-lg text-sm font-bold ${teamRetRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : teamRetRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{teamRetRate}%</span>
                           </div>
                           <div className="flex gap-3 mb-4">
+                            {/* [CHANGE #11] Added Last Year box */}
                             <div className="flex-1 bg-slate-800/50 rounded-lg p-2.5 text-center">
-                              <p className="text-xs text-slate-500">Players</p>
+                              <p className="text-xs text-slate-500">Last Yr</p>
+                              <p className="font-bold text-slate-400">{t.lastYear || t.count}</p>
+                            </div>
+                            <div className="flex-1 bg-slate-800/50 rounded-lg p-2.5 text-center">
+                              <p className="text-xs text-slate-500">This Yr</p>
                               <p className="font-bold text-white">{t.count}</p>
+                            </div>
+                            {/* [CHANGE #11] Added New box */}
+                            <div className="flex-1 bg-emerald-500/10 rounded-lg p-2.5 text-center">
+                              <p className="text-xs text-emerald-400">New</p>
+                              <p className="font-bold text-emerald-400">{t.newPlayers || 0}</p>
                             </div>
                             <div className="flex-1 bg-blue-500/10 rounded-lg p-2.5 text-center">
                               <p className="text-xs text-blue-400">Retained</p>
@@ -1405,4 +1661,3 @@ setAgeDiag(ageRows.map(r => {
     </div>
   );
 }
-
