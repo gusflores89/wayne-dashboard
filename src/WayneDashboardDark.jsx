@@ -518,17 +518,34 @@ export default function WayneDashboard({ onLogout }) {
   };
 
   // Punto 6: Export Excel (Solo exportar Lost Players)
-  const handleExportLostOnly = () => {
-    const lostPlayers = playerList.filter(p => p.status === 'Lost' && !p.agedOut).map(p => ({
-      Name: p.name, 
-      Gender: p.gender === 'M' ? 'Boys' : 'Girls', 
-      'Team (Last Year)': p.teamLast, 
-      'Program': p.program,
-      Status: 'Lost',
-      'Fee': p.fee
+  const handleExportTeamsRevenue = () => {
+  const data = filteredTeams
+    .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
+    .map((t, idx) => ({
+      Rank: idx + 1,
+      Team: t.name,
+      Program: t.program,
+      Coach: t.coach,
+      'Players Lost': t.lost,
+      'Fee': `$${t.fee}`,
+      'Revenue Lost': `$${(t.lost * t.fee).toLocaleString()}`
     }));
-    exportToExcel(lostPlayers, 'RetainPlayers_LOST_ONLY', 'Lost Players');
-  };
+  exportToExcel(data, 'Teams_Revenue_Lost', 'Revenue');
+};
+
+const handleExportCoaches = () => {
+  const data = coachStats.coaches.map((c, idx) => ({
+    Rank: idx + 1,
+    Coach: c.name,
+    Teams: c.teams.length,
+    Players: c.totalPlayers,
+    Retained: c.retained,
+    Lost: c.lost,
+    'Churn Rate': `${c.churnRate}%`,
+    'Revenue Lost': `$${c.revenueLost.toLocaleString()}`
+  }));
+  exportToExcel(data, 'Coach_Revenue', 'Coaches');
+};
 
   const handleLogout = () => {
     localStorage.removeItem("rp_authenticated");
