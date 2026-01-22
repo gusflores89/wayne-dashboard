@@ -32,12 +32,12 @@ const URLS = {
 
 // --- GLOBAL COLORS ---
 const COLORS = {
-  CLUB: "#3A7FC3", // Azul institucional
-  BOYS: "#3b82f6", // Azul vibrante
-  GIRLS: "#ec4899", // Rosa vibrante
-  LOST: "#f43f5e", // Rojo rosado
-  GREEN_LINE: "#10b981", // Verde para tasas
-  NEW: "#10b981",   // Emerald para nuevos
+  CLUB: "#3A7FC3",
+  BOYS: "#3b82f6",
+  GIRLS: "#ec4899",
+  LOST: "#f43f5e",
+  GREEN_LINE: "#10b981",
+  NEW: "#10b981",
   GROWTH: "#10b981",
   RISK: "#f43f5e"
 };
@@ -95,11 +95,15 @@ function pick(obj, candidates) {
   return "";
 }
 
-function normalizePercent(val) {
-  const n = toNumber(val);
-  if (n > 1 && n <= 100) return n;
-  if (n > 0 && n <= 1) return Math.round(n * 100);
-  return n;
+// Helper para detectar género del programa basado en el nombre
+function getProgramGender(programName) {
+  const name = (programName || "").toLowerCase();
+  // Girls programs
+  if (name.includes("girls") || name === "pre-ecnl") {
+    return "F";
+  }
+  // Boys programs (MLS Next, NPL, Boys...)
+  return "M";
 }
 
 function exportToExcel(data, filename, sheetName = "Data") {
@@ -115,30 +119,6 @@ function exportToExcel(data, filename, sheetName = "Data") {
     }));
     ws['!cols'] = colWidths;
     XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31)); 
-    XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
-  } catch (error) {
-    console.error("Export error:", error);
-    alert("Error exporting file. Please try again.");
-  }
-}
-
-function exportMultipleSheetsToExcel(sheets, filename) {
-  try {
-    const wb = XLSX.utils.book_new();
-    sheets.forEach(({ data, name }) => {
-      if (data && data.length > 0) {
-        const ws = XLSX.utils.json_to_sheet(data);
-        const colWidths = Object.keys(data[0]).map(key => ({
-          wch: Math.max(key.length + 2, ...data.map(row => String(row[key] || '').length + 2))
-        }));
-        ws['!cols'] = colWidths;
-        XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
-      }
-    });
-    if (wb.SheetNames.length === 0) {
-      alert("No data to export");
-      return;
-    }
     XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
   } catch (error) {
     console.error("Export error:", error);
@@ -241,7 +221,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         {payload.map((item, idx) => (
           <p key={idx} className="text-sm" style={{ color: item.color }}>
             {item.name}: {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
-            {item.name?.toLowerCase().includes('rate') ? '%' : ''}
+            {item.name?.toLowerCase().includes('rate') || item.name?.toLowerCase().includes('%') ? '%' : ''}
           </p>
         ))}
       </div>
@@ -263,12 +243,11 @@ export default function WayneDashboard({ onLogout }) {
   const [err, setErr] = useState("");
 
   const [kpisGender, setKpisGender] = useState(null);
-  const [programs, setPrograms] = useState([]);
-  const [ageDiag, setAgeDiag] = useState([]);
+  const [programs, setPrograms] = useState([]); // NEW: Programs from new sheet
   const [teams, setTeams] = useState([]);
   const [playerList, setPlayerList] = useState([]);
 
-  // --- REPARACIÓN 1: Definir ActiveColor para los gráficos ---
+  // Determine current active color
   const activeColor = genderFilter === 'boys' ? COLORS.BOYS : genderFilter === 'girls' ? COLORS.GIRLS : COLORS.CLUB;
 
   useEffect(() => {
@@ -277,14 +256,12 @@ export default function WayneDashboard({ onLogout }) {
       try {
         const responses = await Promise.all([
           fetch(URLS.KPIS_GENDER).then(res => res.text()),
-          fetch(URLS.PROGRAMS).then(res => res.text()),
-          // Cache Buster para Age Diagnostic (por si acaso)
-          fetch(URLS.AGE + (URLS.AGE.includes('?') ? '&' : '?') + "t=" + Date.now()).then(res => res.text()),
+          fetch(URLS.PROGRAMS).then(res => res.text()), // NEW: Fetch programs
           fetch(URLS.TEAMS).then(res => res.text()),
           fetch(URLS.PLAYERS).then(res => res.text()),
         ]);
 
-        const [kpiText, progText, ageText, teamText, playerText] = responses;
+        const [kpiText, programText, teamText, playerText] = responses;
 
         // KPIs
         const kpiRows = rowsToObjects(parseCSV(kpiText));
@@ -304,32 +281,25 @@ export default function WayneDashboard({ onLogout }) {
         });
         setKpisGender(kpiMap);
 
-        // Programs (Dynamic from players for accuracy)
-        const progRows = rowsToObjects(parseCSV(progText));
-        setPrograms(progRows);
-
-        // Age Diagnostic
-        const ageRows = rowsToObjects(parseCSV(ageText));
-        setAgeDiag(ageRows.map(r => {
-          const playersLast = toNumber(pick(r, ["playersLast", "Players"]));
-          const playersThis = toNumber(pick(r, ["playersThis"]));
-          const boysLast = toNumber(pick(r, ["boysLast"]));
-          const boysThis = toNumber(pick(r, ["boysThis"]));
-          const girlsLast = toNumber(pick(r, ["girlsLast"]));
-          const girlsThis = toNumber(pick(r, ["girlsThis"]));
-          const rate = normalizePercent(pick(r, ["rate"]));
-          
+        // NEW: Programs from new sheet structure
+        // Columns: name, retained, lost, lastYear, thisYear, retentionRate, churn
+        const programRows = rowsToObjects(parseCSV(programText));
+        const parsedPrograms = programRows.map(r => {
+          const name = pick(r, ["name", "Name"]) || "";
           return {
-            year: String(pick(r, ["year"])),
-            rate: rate,
-            playersLast, playersThis, boysLast, boysThis, girlsLast, girlsThis,
-            boysRate: boysLast > 0 ? Math.round((Math.min(boysLast, boysThis)/boysLast)*100) : 0,
-            girlsRate: girlsLast > 0 ? Math.round((Math.min(girlsLast, girlsThis)/girlsLast)*100) : 0,
-            risk: pick(r, ["risk"])
+            name,
+            retained: toNumber(pick(r, ["retained", "Retained"])),
+            lost: toNumber(pick(r, ["lost", "Lost"])),
+            lastYear: toNumber(pick(r, ["lastYear", "LastYear", "last_year"])),
+            thisYear: toNumber(pick(r, ["thisYear", "ThisYear", "this_year"])),
+            retentionRate: toNumber(pick(r, ["retentionRate", "RetentionRate", "retention_rate"])),
+            churn: toNumber(pick(r, ["churn", "Churn"])),
+            gender: getProgramGender(name) // Auto-detect gender from name
           };
-        }));
+        }).filter(p => p.name); // Filter out empty rows
+        setPrograms(parsedPrograms);
 
-        // Teams (Exclude Goalkeepers)
+        // Teams
         const teamRows = rowsToObjects(parseCSV(teamText));
         setTeams(teamRows.map(r => {
           const name = pick(r, ["name"]) || "";
@@ -364,7 +334,7 @@ export default function WayneDashboard({ onLogout }) {
           else gender = "M";
 
           const birthYear = pick(r, ["birth_year", "Age Group (Last Yr)"]) || "";
-          const program = pick(r, ["program_this", "Program (This Yr)", "program"]) || "Unknown";
+          const program = pick(r, ["program_this", "Program (This Yr)", "program"]) || pick(r, ["program_last", "Program (Last Yr)"]) || "Unknown";
 
           return {
             name: `${pick(r, ["first_name"])} ${pick(r, ["last_name"])}`.trim(),
@@ -402,58 +372,60 @@ export default function WayneDashboard({ onLogout }) {
 
   // --- DYNAMIC CALCULATIONS ---
 
-  // 1. Retention by PROGRAM (Dynamic)
+  // NEW: Retention by PROGRAM (from new sheet data)
   const filteredPrograms = useMemo(() => {
+    return programs
+      .filter(p => {
+        if (genderFilter === 'boys') return p.gender === 'M';
+        if (genderFilter === 'girls') return p.gender === 'F';
+        return true; // Club shows all
+      })
+      .map(p => ({
+        name: p.name,
+        displayRetained: p.retained,
+        displayLost: p.lost,
+        displayRate: p.retentionRate,
+        lastYear: p.lastYear,
+        thisYear: p.thisYear,
+        churn: p.churn,
+        gender: p.gender,
+        // Color based on gender
+        barColor: p.gender === 'F' ? COLORS.GIRLS : COLORS.BOYS
+      }))
+      .sort((a, b) => b.displayRetained - a.displayRetained);
+  }, [programs, genderFilter]);
+
+  // Retention by AGE
+  const ageComparisonData = useMemo(() => {
     const stats = {};
     playerList.forEach(p => {
-        if (genderFilter === 'boys' && p.gender !== 'M') return;
-        if (genderFilter === 'girls' && p.gender !== 'F') return;
-        
-        const prog = p.program || "Unknown";
-        if (!stats[prog]) stats[prog] = { retained: 0, lost: 0 };
-        
-        if (p.status === 'Retained') stats[prog].retained += 1;
-        if (p.status === 'Lost' && !p.agedOut) stats[prog].lost += 1;
+      if (genderFilter === 'boys' && p.gender !== 'M') return;
+      if (genderFilter === 'girls' && p.gender !== 'F') return;
+      if (!p.birthYear) return;
+
+      const year = p.birthYear;
+      if (!stats[year]) stats[year] = { last: 0, this: 0, retained: 0 };
+      
+      if (p.teamLast) stats[year].last += 1;
+      if (p.teamThis) stats[year].this += 1;
+      if (p.status === 'Retained') stats[year].retained += 1;
     });
 
-    return Object.keys(stats).map(name => {
-      const { retained, lost } = stats[name];
-      const total = retained + lost;
+    return Object.keys(stats).map(year => {
+      const s = stats[year];
       return {
-        name,
-        displayRetained: retained,
-        displayLost: lost,
-        displayRate: total > 0 ? Math.round((retained / total) * 100) : 0
-      };
-    }).filter(p => p.displayRetained > 0 || p.displayLost > 0).sort((a, b) => b.displayRetained - a.displayRetained);
-  }, [playerList, genderFilter]);
-
-  // 2. Retention by AGE (REPARACIÓN 2: Ordenar 2005 -> 2020)
-  const ageComparisonData = useMemo(() => {
-    return ageDiag.map(a => {
-      let pLast = a.playersLast;
-      let pThis = a.playersThis;
-      let pRate = a.rate;
-
-      if (genderFilter === 'boys') {
-        pLast = a.boysLast; pThis = a.boysThis; pRate = a.boysRate;
-      } else if (genderFilter === 'girls') {
-        pLast = a.girlsLast; pThis = a.girlsThis; pRate = a.girlsRate;
-      }
-
-      return {
-        ...a,
-        playersLast: pLast,
-        playersThis: pThis,
-        rate: pRate,
-        change: pLast > 0 ? Math.round(((pThis - pLast) / pLast) * 100) : 0
+        year,
+        playersLast: s.last,
+        playersThis: s.this,
+        rate: s.last > 0 ? Math.round((s.retained / s.last) * 100) : 0,
+        change: s.last > 0 ? Math.round(((s.this - s.last) / s.last) * 100) : 0
       };
     })
-    .sort((a, b) => Number(a.year) - Number(b.year)) // ORDEN ASCENDENTE (2005 -> 2020)
+    .sort((a, b) => Number(b.year) - Number(a.year))
     .filter(a => a.playersLast > 0 || a.playersThis > 0);
-  }, [ageDiag, genderFilter]);
+  }, [playerList, genderFilter]);
 
-  // 3. Filtered Teams
+  // Filtered Teams
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return teams.filter((t) => {
@@ -465,7 +437,7 @@ export default function WayneDashboard({ onLogout }) {
     });
   }, [teams, searchTerm, genderFilter]);
 
-  // 4. Revenue Calculations
+  // Revenue Calculations
   const exactRevenueLost = useMemo(() => {
     const lostP = playerList.filter(p => p.status === 'Lost' && !p.agedOut);
     const genderLost = lostP.filter(p => {
@@ -476,7 +448,6 @@ export default function WayneDashboard({ onLogout }) {
     return genderLost.reduce((total, p) => total + (p.fee > 0 ? p.fee : activeData.fee), 0);
   }, [playerList, genderFilter, activeData.fee]);
 
-  // --- REPARACIÓN 3: Volver a definir exactNewRevenue para Financials ---
   const exactNewRevenue = useMemo(() => {
     const newP = playerList.filter(p => p.status === 'New');
     const genderNew = newP.filter(p => {
@@ -490,7 +461,7 @@ export default function WayneDashboard({ onLogout }) {
   const netImpact = exactNewRevenue - exactRevenueLost;
   const potentialRecovery = Math.round(exactRevenueLost * 0.3);
 
-  // 5. Gender Pie
+  // Gender Pie
   const genderPieData = useMemo(() => {
     if (!kpisGender) return [];
     return [
@@ -499,7 +470,7 @@ export default function WayneDashboard({ onLogout }) {
     ];
   }, [kpisGender]);
 
-  // 6. Coach Stats
+  // Coach Stats
   const coachStats = useMemo(() => {
     if (filteredTeams.length === 0) return { coaches: [], totalRevenueLost: 0, avgFee: 3000 };
     const avgFee = activeData.fee || 3000;
@@ -522,7 +493,7 @@ export default function WayneDashboard({ onLogout }) {
     return { coaches, totalRevenueLost: coaches.reduce((acc, c) => acc + c.revenueLost, 0), avgFee };
   }, [filteredTeams, activeData.fee]);
 
-  // 7. Deep Dive
+  // Deep Dive
   const deepDiveStats = useMemo(() => {
     if (!selectedEntity.id) return null;
     const relevantTeams = selectedEntity.type === 'coach' 
@@ -533,8 +504,6 @@ export default function WayneDashboard({ onLogout }) {
     const totalRet = relevantTeams.reduce((acc, curr) => acc + curr.retained, 0);
     const totalCount = relevantTeams.reduce((acc, curr) => acc + curr.count, 0);
     const lostRevenue = relevantTeams.reduce((acc, curr) => acc + (curr.lost * curr.fee), 0);
-    
-    // REPARACIÓN 4: Agregar cálculo de "New" para el Deep Dive
     const calculatedNew = Math.max(0, totalCount - totalRet);
 
     return {
@@ -572,39 +541,53 @@ export default function WayneDashboard({ onLogout }) {
     });
   };
 
+  // FIX: Added missing handleExportLostOnly function
   const handleExportLostOnly = () => {
-    const lostPlayers = playerList.filter(p => p.status === 'Lost' && !p.agedOut).map(p => ({
-      Name: p.name, 
-      Gender: p.gender === 'M' ? 'Boys' : 'Girls', 
-      'Team (Last Year)': p.teamLast, 
-      'Program': p.program,
-      Status: 'Lost',
-      'Fee': p.fee
-    }));
-    exportToExcel(lostPlayers, 'RetainPlayers_LOST_ONLY', 'Lost Players');
+    const lostPlayers = playerList
+      .filter(p => p.status === 'Lost' && !p.agedOut)
+      .filter(p => {
+        if (genderFilter === 'boys') return p.gender === 'M';
+        if (genderFilter === 'girls') return p.gender === 'F';
+        return true;
+      });
+    
+    exportToExcel(lostPlayers.map(p => ({
+      Name: p.name,
+      'Last Team': p.teamLast || '',
+      Gender: p.gender === 'M' ? 'Boys' : 'Girls',
+      Program: p.program,
+      'Birth Year': p.birthYear,
+      Fee: p.fee || activeData.fee
+    })), 'Lost_Players', 'Lost');
   };
 
   const handleExportTeamsRevenue = () => {
-    const data = filteredTeams.sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee)).map((t, idx) => ({
-      'Rank': idx + 1,
-      'Team': t.name,
-      'Program': t.program,
-      'Coach': t.coach,
-      'Players Lost': t.lost,
-      'Revenue Lost': `$${(t.lost * t.fee).toLocaleString()}`
-    }));
-    exportToExcel(data, 'Teams_Revenue_Lost', 'Revenue Lost');
+    const data = filteredTeams
+      .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
+      .map((t, idx) => ({
+        Rank: idx + 1,
+        Team: t.name,
+        Program: t.program,
+        Coach: t.coach,
+        'Players Lost': t.lost,
+        'Fee': `$${t.fee}`,
+        'Revenue Lost': `$${(t.lost * t.fee).toLocaleString()}`
+      }));
+    exportToExcel(data, 'Teams_Revenue_Lost', 'Revenue');
   };
 
   const handleExportCoaches = () => {
     const data = coachStats.coaches.map((c, idx) => ({
-      'Rank': idx + 1,
-      'Coach': c.name,
-      'Teams': c.teams.map(t => t.name).join(', '),
-      'Players Lost': c.lost,
+      Rank: idx + 1,
+      Coach: c.name,
+      Teams: c.teams.length,
+      Players: c.totalPlayers,
+      Retained: c.retained,
+      Lost: c.lost,
+      'Churn Rate': `${c.churnRate}%`,
       'Revenue Lost': `$${c.revenueLost.toLocaleString()}`
     }));
-    exportToExcel(data, 'Coach_Revenue_Impact', 'Coaches');
+    exportToExcel(data, 'Coach_Revenue', 'Coaches');
   };
 
   const handleLogout = () => {
@@ -670,7 +653,7 @@ export default function WayneDashboard({ onLogout }) {
         {err && <div className="text-center p-12 text-rose-400">{err}</div>}
 
         {/* OVERVIEW */}
-        {activeTab === "overview" && (
+        {activeTab === "overview" && !loading && !err && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
@@ -694,21 +677,27 @@ export default function WayneDashboard({ onLogout }) {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+              {/* RETENTION BY PROGRAM - NEW IMPLEMENTATION */}
               <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50 lg:col-span-2">
                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                   <ClipboardList size={18} className="text-blue-400" />Retention by Program
-                  {genderFilter !== 'club' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg ml-2">{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={filteredPrograms} margin={{ left: 0, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} angle={-15} textAnchor="end" height={60} />
                       <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                       <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                      <Bar yAxisId="left" dataKey="displayRetained" name="Retained" fill={activeColor} radius={[4, 4, 0, 0]} />
+                      {/* Dynamic bar colors based on gender */}
+                      <Bar yAxisId="left" dataKey="displayRetained" name="Retained" radius={[4, 4, 0, 0]}>
+                        {filteredPrograms.map((entry, index) => (
+                          <Cell key={`cell-ret-${index}`} fill={entry.barColor} />
+                        ))}
+                      </Bar>
                       <Bar yAxisId="left" dataKey="displayLost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
                       <Line yAxisId="right" type="monotone" dataKey="displayRate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={3} dot={{ r: 5, fill: COLORS.GREEN_LINE }} />
                     </ComposedChart>
@@ -728,13 +717,23 @@ export default function WayneDashboard({ onLogout }) {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
+                <div className="flex justify-center gap-6 mt-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.BOYS }}></div>
+                    <span className="text-xs text-slate-400">Boys</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.GIRLS }}></div>
+                    <span className="text-xs text-slate-400">Girls</span>
+                  </div>
+                </div>
               </div>
             </div>
           </>
         )}
 
         {/* DIAGNOSIS */}
-        {activeTab === "diagnosis" && (
+        {activeTab === "diagnosis" && !loading && !err && (
           <div className="space-y-6">
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
@@ -760,7 +759,6 @@ export default function WayneDashboard({ onLogout }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Positive Growth Groups */}
               <div>
                 <h5 className="text-emerald-400 font-bold mb-3 flex items-center gap-2"><ArrowUpRight size={20}/> Growth Leaders (Positive Change)</h5>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -774,7 +772,6 @@ export default function WayneDashboard({ onLogout }) {
                 </div>
               </div>
 
-              {/* Negative Growth Groups */}
               <div>
                 <h5 className="text-rose-400 font-bold mb-3 flex items-center gap-2"><ArrowDownRight size={20}/> Risk Groups (Negative Change)</h5>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -792,7 +789,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* FINANCIALS */}
-        {activeTab === "financials" && (
+        {activeTab === "financials" && !loading && !err && (
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-8 rounded-2xl shadow-lg shadow-rose-500/20">
               <div className="flex items-center gap-5">
@@ -863,7 +860,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* TEAMS */}
-        {activeTab === "full-roster" && (
+        {activeTab === "full-roster" && !loading && !err && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
@@ -902,7 +899,6 @@ export default function WayneDashboard({ onLogout }) {
                     {filteredTeams.map((team, idx) => {
                       const total = team.retained + team.lost;
                       const retRate = total > 0 ? Math.round((team.retained / total) * 100) : 0;
-                      // Calculate New based on current roster count - retained
                       const newCount = Math.max(0, team.count - team.retained);
                       return (
                         <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
@@ -925,7 +921,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* COACHES */}
-        {activeTab === "coaches" && (
+        {activeTab === "coaches" && !loading && !err && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 p-5 rounded-2xl border border-rose-500/30">
@@ -987,8 +983,8 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* DEEP DIVE (Punto 11: Columnas agregadas) */}
-        {activeTab === "deep-dive" && (
+        {/* DEEP DIVE */}
+        {activeTab === "deep-dive" && !loading && !err && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <div className="lg:col-span-1 bg-[#111827] p-5 rounded-2xl border border-slate-700/50 h-fit">
               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Select Focus</h4>
