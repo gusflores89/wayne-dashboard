@@ -30,7 +30,7 @@ const URLS = {
   PLAYERS: getEnvVar("VITE_SHEET_PLAYERS_CSV")
 };
 
-// --- GLOBAL COLORS (Punto 3 de la lista) ---
+// --- GLOBAL COLORS ---
 const COLORS = {
   CLUB: "#3A7FC3", // Azul institucional
   BOYS: "#3b82f6", // Azul vibrante
@@ -235,7 +235,6 @@ export default function WayneDashboard({ onLogout }) {
   const [teams, setTeams] = useState([]);
   const [playerList, setPlayerList] = useState([]);
 
-  // Determine current active color (Punto 3: Colores consistentes)
   const activeColor = genderFilter === 'boys' ? COLORS.BOYS : genderFilter === 'girls' ? COLORS.GIRLS : COLORS.CLUB;
 
   useEffect(() => {
@@ -268,7 +267,7 @@ export default function WayneDashboard({ onLogout }) {
         });
         setKpisGender(kpiMap);
 
-        // Teams (Punto 4: Eliminar Goalkeepers)
+        // Teams
         const teamRows = rowsToObjects(parseCSV(teamText));
         setTeams(teamRows.map(r => {
           const name = pick(r, ["name"]) || "";
@@ -303,7 +302,6 @@ export default function WayneDashboard({ onLogout }) {
           else gender = "M";
 
           const birthYear = pick(r, ["birth_year", "Age Group (Last Yr)"]) || "";
-          // Punto 1: Mostrar TODOS los programas
           const program = pick(r, ["program_this", "Program (This Yr)", "program"]) || pick(r, ["program_last", "Program (Last Yr)"]) || "Unknown";
 
           return {
@@ -342,7 +340,6 @@ export default function WayneDashboard({ onLogout }) {
 
   // --- DYNAMIC CALCULATIONS ---
 
-  // Punto 1: Retention by PROGRAM (Dynamic from players)
   const filteredPrograms = useMemo(() => {
     const stats = {};
     playerList.forEach(p => {
@@ -368,7 +365,7 @@ export default function WayneDashboard({ onLogout }) {
     }).filter(p => p.displayRetained > 0 || p.displayLost > 0).sort((a, b) => b.displayRetained - a.displayRetained);
   }, [playerList, genderFilter]);
 
-  // Punto 7 & 8: Retention by AGE (Correct rates & Sorted Youngest -> Oldest)
+  // 2. Retention by AGE (FIXED SORT ORDER: 2005 -> 2020)
   const ageComparisonData = useMemo(() => {
     const stats = {};
     playerList.forEach(p => {
@@ -394,11 +391,10 @@ export default function WayneDashboard({ onLogout }) {
         change: s.last > 0 ? Math.round(((s.this - s.last) / s.last) * 100) : 0
       };
     })
-    .sort((a, b) => Number(b.year) - Number(a.year)) // Sort Descending (2019 -> 2007)
+    .sort((a, b) => Number(a.year) - Number(b.year)) // FIXED: Ascending Order
     .filter(a => a.playersLast > 0 || a.playersThis > 0);
   }, [playerList, genderFilter]);
 
-  // Filtered Teams
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return teams.filter((t) => {
@@ -410,7 +406,6 @@ export default function WayneDashboard({ onLogout }) {
     });
   }, [teams, searchTerm, genderFilter]);
 
-  // Punto 10: Exact Revenue Calculation (Use Real Fees)
   const exactRevenueLost = useMemo(() => {
     const lostP = playerList.filter(p => p.status === 'Lost' && !p.agedOut);
     const genderLost = lostP.filter(p => {
@@ -418,7 +413,6 @@ export default function WayneDashboard({ onLogout }) {
         if (genderFilter === 'girls') return p.gender === 'F';
         return true;
     });
-    // Fallback to activeData.fee if p.fee is 0/missing
     return genderLost.reduce((total, p) => total + (p.fee > 0 ? p.fee : activeData.fee), 0);
   }, [playerList, genderFilter, activeData.fee]);
 
@@ -435,7 +429,6 @@ export default function WayneDashboard({ onLogout }) {
   const netImpact = exactNewRevenue - exactRevenueLost;
   const potentialRecovery = Math.round(exactRevenueLost * 0.3);
 
-  // Gender Pie
   const genderPieData = useMemo(() => {
     if (!kpisGender) return [];
     return [
@@ -444,7 +437,6 @@ export default function WayneDashboard({ onLogout }) {
     ];
   }, [kpisGender]);
 
-  // Coach Stats
   const coachStats = useMemo(() => {
     if (filteredTeams.length === 0) return { coaches: [], totalRevenueLost: 0, avgFee: 3000 };
     const avgFee = activeData.fee || 3000;
@@ -467,7 +459,6 @@ export default function WayneDashboard({ onLogout }) {
     return { coaches, totalRevenueLost: coaches.reduce((acc, c) => acc + c.revenueLost, 0), avgFee };
   }, [filteredTeams, activeData.fee]);
 
-  // Deep Dive
   const deepDiveStats = useMemo(() => {
     if (!selectedEntity.id) return null;
     const relevantTeams = selectedEntity.type === 'coach' 
@@ -478,7 +469,6 @@ export default function WayneDashboard({ onLogout }) {
     const totalRet = relevantTeams.reduce((acc, curr) => acc + curr.retained, 0);
     const totalCount = relevantTeams.reduce((acc, curr) => acc + curr.count, 0);
     const lostRevenue = relevantTeams.reduce((acc, curr) => acc + (curr.lost * curr.fee), 0);
-    // Estimate "New" based on delta
     const calculatedNew = Math.max(0, totalCount - totalRet);
 
     return {
@@ -498,7 +488,6 @@ export default function WayneDashboard({ onLogout }) {
 
   // --- ACTIONS ---
 
-  // Punto 5: Arreglar "Click for details" en Overview
   const handleOpenPlayerList = (filter, title) => {
     let matchedPlayers = playerList;
 
@@ -517,35 +506,40 @@ export default function WayneDashboard({ onLogout }) {
     });
   };
 
-  // Punto 6: Export Excel (Solo exportar Lost Players)
+  const handleExportLostOnly = () => {
+    const lostPlayers = playerList.filter(p => p.status === 'Lost' && !p.agedOut).map(p => ({
+      Name: p.name, 
+      Gender: p.gender === 'M' ? 'Boys' : 'Girls', 
+      'Team (Last Year)': p.teamLast, 
+      'Program': p.program,
+      Status: 'Lost',
+      'Fee': p.fee
+    }));
+    exportToExcel(lostPlayers, 'RetainPlayers_LOST_ONLY', 'Lost Players');
+  };
+
   const handleExportTeamsRevenue = () => {
-  const data = filteredTeams
-    .sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee))
-    .map((t, idx) => ({
-      Rank: idx + 1,
-      Team: t.name,
-      Program: t.program,
-      Coach: t.coach,
+    const data = filteredTeams.sort((a, b) => (b.lost * b.fee) - (a.lost * a.fee)).map((t, idx) => ({
+      'Rank': idx + 1,
+      'Team': t.name,
+      'Program': t.program,
+      'Coach': t.coach,
       'Players Lost': t.lost,
-      'Fee': `$${t.fee}`,
       'Revenue Lost': `$${(t.lost * t.fee).toLocaleString()}`
     }));
-  exportToExcel(data, 'Teams_Revenue_Lost', 'Revenue');
-};
+    exportToExcel(data, 'Teams_Revenue_Lost', 'Revenue Lost');
+  };
 
-const handleExportCoaches = () => {
-  const data = coachStats.coaches.map((c, idx) => ({
-    Rank: idx + 1,
-    Coach: c.name,
-    Teams: c.teams.length,
-    Players: c.totalPlayers,
-    Retained: c.retained,
-    Lost: c.lost,
-    'Churn Rate': `${c.churnRate}%`,
-    'Revenue Lost': `$${c.revenueLost.toLocaleString()}`
-  }));
-  exportToExcel(data, 'Coach_Revenue', 'Coaches');
-};
+  const handleExportCoaches = () => {
+    const data = coachStats.coaches.map((c, idx) => ({
+      'Rank': idx + 1,
+      'Coach': c.name,
+      'Teams': c.teams.map(t => t.name).join(', '),
+      'Players Lost': c.lost,
+      'Revenue Lost': `$${c.revenueLost.toLocaleString()}`
+    }));
+    exportToExcel(data, 'Coach_Revenue_Impact', 'Coaches');
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("rp_authenticated");
@@ -699,7 +693,6 @@ const handleExportCoaches = () => {
               </div>
             </div>
 
-            {/* Punto 9: Agregar cards de age groups POSITIVOS y NEGATIVOS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Positive Growth Groups */}
               <div>
@@ -803,7 +796,7 @@ const handleExportCoaches = () => {
           </div>
         )}
 
-        {/* TEAMS (Punto 11: Columna "New" agregada) */}
+        {/* TEAMS */}
         {activeTab === "full-roster" && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
