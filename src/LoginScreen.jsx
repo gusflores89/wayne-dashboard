@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Lock, Eye, EyeOff, Shield, AlertCircle } from "lucide-react";
+import { Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 export default function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("");
@@ -40,11 +40,11 @@ export default function LoginScreen({ onLogin }) {
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600/20 rounded-2xl mb-4 border border-blue-500/30">
-            <Shield className="w-8 h-8 text-blue-400" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <img src="/logo.png" alt="RetainPlayers" className="w-20 h-20" />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">
-            Retain<span className="text-blue-400">Players</span>
+          <h1 className="text-3xl font-black text-white tracking-tight" style={{ fontFamily: 'Oswald, sans-serif' }}>
+            RETAIN<span className="text-[#5DB3F5]">PLAYERS</span>
           </h1>
           <p className="text-slate-400 mt-2 text-sm">
             Retention Analytics for Soccer Clubs
