@@ -136,7 +136,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
     exportToExcel(players.map(p => ({
       Name: p.name,
       Status: p.status,
-      Team: p.team || p.teamLast || '',
+      Team: p.team || p.teamPrior || '',
       Gender: p.gender === 'M' ? 'Boys' : 'Girls',
       Program: p.program || '',
       Fee: p.fee
@@ -334,18 +334,25 @@ export default function WayneDashboard({ onLogout }) {
           else gender = "M";
 
           const birthYear = pick(r, ["birth_year", "Age Group (Last Yr)"]) || "";
-          const program = pick(r, ["program_this", "Program (This Yr)", "program"]) || pick(r, ["program_last", "Program (Last Yr)"]) || "Unknown";
+          const program = pick(r, ["program_current", "program_this", "Program (This Yr)", "program"]) || pick(r, ["program_prior", "program_last", "Program (Last Yr)"]) || "Unknown";
+
+          // Read both fees for proper calculation
+          const feePrior = toNumber(pick(r, ["fee_prior", "fee_last"]));
+          const feeCurrent = toNumber(pick(r, ["fee_current", "fee_this", "fee", "Fee"]));
 
           return {
             name: `${pick(r, ["first_name"])} ${pick(r, ["last_name"])}`.trim(),
             status,
-            teamLast: pick(r, ["Team (Last Yr)"]),
-            teamThis: pick(r, ["Team (This Yr)"]),
+            teamPrior: pick(r, ["team_prior", "Team (Last Yr)"]),
+            teamCurrent: pick(r, ["team_current", "Team (This Yr)"]),
             gender,
             agedOut: isAgedOut,
             birthYear: birthYear.replace(/[^0-9]/g, ''), 
             program,
-            fee: toNumber(pick(r, ["fee_this", "fee", "Fee"])) || 0 
+            feePrior,
+            feeCurrent,
+            // Use appropriate fee based on status
+            fee: status === 'Lost' ? feePrior : feeCurrent
           };
         }));
 
@@ -406,8 +413,8 @@ export default function WayneDashboard({ onLogout }) {
       const year = p.birthYear;
       if (!stats[year]) stats[year] = { last: 0, this: 0, retained: 0 };
       
-      if (p.teamLast) stats[year].last += 1;
-      if (p.teamThis) stats[year].this += 1;
+      if (p.teamPrior) stats[year].last += 1;
+      if (p.teamCurrent) stats[year].this += 1;
       if (p.status === 'Retained') stats[year].retained += 1;
     });
 
@@ -445,7 +452,7 @@ export default function WayneDashboard({ onLogout }) {
         if (genderFilter === 'girls') return p.gender === 'F';
         return true;
     });
-    return genderLost.reduce((total, p) => total + (p.fee > 0 ? p.fee : activeData.fee), 0);
+    return Math.round(genderLost.reduce((total, p) => total + (p.feePrior > 0 ? p.feePrior : activeData.fee), 0));
   }, [playerList, genderFilter, activeData.fee]);
 
   const exactNewRevenue = useMemo(() => {
@@ -455,7 +462,7 @@ export default function WayneDashboard({ onLogout }) {
         if (genderFilter === 'girls') return p.gender === 'F';
         return true;
     });
-    return genderNew.reduce((total, p) => total + (p.fee > 0 ? p.fee : activeData.fee), 0);
+    return Math.round(genderNew.reduce((total, p) => total + (p.feeCurrent > 0 ? p.feeCurrent : activeData.fee), 0));
   }, [playerList, genderFilter, activeData.fee]);
 
   const netImpact = exactNewRevenue - exactRevenueLost;
@@ -527,7 +534,7 @@ export default function WayneDashboard({ onLogout }) {
     let matchedPlayers = playerList;
 
     if (filter.status) matchedPlayers = matchedPlayers.filter(p => p.status === filter.status);
-    if (filter.team) matchedPlayers = matchedPlayers.filter(p => p.teamLast === filter.team || p.teamThis === filter.team);
+    if (filter.team) matchedPlayers = matchedPlayers.filter(p => p.teamPrior === filter.team || p.teamCurrent === filter.team);
     if (filter.status === 'Lost') matchedPlayers = matchedPlayers.filter(p => !p.agedOut);
 
     if (genderFilter === 'boys') matchedPlayers = matchedPlayers.filter(p => p.gender === 'M');
@@ -536,7 +543,7 @@ export default function WayneDashboard({ onLogout }) {
     setModal({
       open: true,
       title,
-      players: matchedPlayers.map(p => ({ ...p, team: p.teamLast || p.teamThis })),
+      players: matchedPlayers.map(p => ({ ...p, team: p.teamPrior || p.teamCurrent })),
       subtitle: `${genderFilter !== 'club' ? genderFilter.charAt(0).toUpperCase() + genderFilter.slice(1) + ' - ' : ''}${matchedPlayers.length} players`
     });
   };
@@ -553,11 +560,11 @@ export default function WayneDashboard({ onLogout }) {
     
     exportToExcel(lostPlayers.map(p => ({
       Name: p.name,
-      'Last Team': p.teamLast || '',
+      'Last Team': p.teamPrior || '',
       Gender: p.gender === 'M' ? 'Boys' : 'Girls',
       Program: p.program,
       'Birth Year': p.birthYear,
-      Fee: p.fee || activeData.fee
+      Fee: p.feePrior || activeData.fee
     })), 'Lost_Players', 'Lost');
   };
 
@@ -605,7 +612,7 @@ export default function WayneDashboard({ onLogout }) {
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#3A7FC3]/30 pb-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <img src="/logo.png" alt="RetainPlayers" className="w-12 h-12" />
+              <img src="/top-left-corner.png" alt="RetainPlayers" className="w-12 h-12" />
               <div>
                 <h1 className="text-2xl font-black text-white tracking-tight" style={{ fontFamily: 'Oswald, sans-serif' }}>
                   RETAIN<span className="text-[#5DB3F5]">PLAYERS</span>
@@ -1050,7 +1057,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         <footer className="mt-10 py-6 border-t border-[#3A7FC3]/30 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
-          <div className="flex items-center gap-2"><img src="/logo.png" alt="RetainPlayers" className="w-6 h-6" /><p>RetainPlayers • Player Retention Intelligence</p></div>
+          <div className="flex items-center gap-2"><img src="/top-left-corner.png" alt="RetainPlayers" className="w-6 h-6" /><p>RetainPlayers • Player Retention Intelligence</p></div>
           <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#5DB3F5] animate-pulse"></div><span>Live Data</span></div>
         </footer>
       </div>
