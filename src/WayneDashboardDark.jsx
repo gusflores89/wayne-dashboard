@@ -382,6 +382,19 @@ export default function WayneDashboard({ onLogout }) {
 
   // --- DYNAMIC CALCULATIONS ---
 
+  // Calculate new players by program from playerList
+  const newByProgram = useMemo(() => {
+    const counts = {};
+    playerList.forEach(p => {
+      if (p.status === 'New' && p.program) {
+        if (genderFilter === 'boys' && p.gender !== 'M') return;
+        if (genderFilter === 'girls' && p.gender !== 'F') return;
+        counts[p.program] = (counts[p.program] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [playerList, genderFilter]);
+
   // NEW: Retention by PROGRAM (from new sheet data)
   const filteredPrograms = useMemo(() => {
     return programs
@@ -394,7 +407,7 @@ export default function WayneDashboard({ onLogout }) {
         name: p.name,
         displayRetained: p.retained,
         displayLost: p.lost,
-        displayNew: p.new || Math.max(0, p.thisYear - p.retained),
+        displayNew: newByProgram[p.name] || 0,
         displayRate: p.retentionRate,
         lastYear: p.lastYear,
         thisYear: p.thisYear,
@@ -404,7 +417,7 @@ export default function WayneDashboard({ onLogout }) {
         barColor: p.gender === 'F' ? COLORS.GIRLS : COLORS.BOYS
       }))
       .sort((a, b) => b.displayRetained - a.displayRetained);
-  }, [programs, genderFilter]);
+  }, [programs, genderFilter, newByProgram]);
 
   // Retention by AGE
   const ageComparisonData = useMemo(() => {
