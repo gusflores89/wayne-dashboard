@@ -41,11 +41,8 @@ export default function LoginScreen({ onLogin }) {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            <img src="/logo.png" alt="RetainPlayers" className="w-20 h-20" />
+            <img src="/front-logo.png" alt="RetainPlayers" className="h-32" />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight" style={{ fontFamily: 'Oswald, sans-serif' }}>
-            RETAIN<span className="text-[#5DB3F5]">PLAYERS</span>
-          </h1>
           <p className="text-slate-400 mt-2 text-sm">
             Retention Analytics for Soccer Clubs
           </p>
