@@ -35,7 +35,7 @@ const COLORS = {
   CLUB: "#3A7FC3",
   BOYS: "#3b82f6",
   GIRLS: "#ec4899",
-  LOST: "#f43f5e",
+  LOST: "#f97316",  // Orange for Lost
   GREEN_LINE: "#10b981",
   NEW: "#10b981",
   GROWTH: "#10b981",
@@ -286,12 +286,15 @@ export default function WayneDashboard({ onLogout }) {
         const programRows = rowsToObjects(parseCSV(programText));
         const parsedPrograms = programRows.map(r => {
           const name = pick(r, ["name", "Name"]) || "";
+          const retained = toNumber(pick(r, ["retained", "Retained"]));
+          const thisYear = toNumber(pick(r, ["thisYear", "ThisYear", "this_year"]));
           return {
             name,
-            retained: toNumber(pick(r, ["retained", "Retained"])),
+            retained,
             lost: toNumber(pick(r, ["lost", "Lost"])),
             lastYear: toNumber(pick(r, ["lastYear", "LastYear", "last_year"])),
-            thisYear: toNumber(pick(r, ["thisYear", "ThisYear", "this_year"])),
+            thisYear,
+            new: Math.max(0, thisYear - retained),  // Calculate new players
             retentionRate: toNumber(pick(r, ["retentionRate", "RetentionRate", "retention_rate"])),
             churn: toNumber(pick(r, ["churn", "Churn"])),
             gender: getProgramGender(name) // Auto-detect gender from name
@@ -391,6 +394,7 @@ export default function WayneDashboard({ onLogout }) {
         name: p.name,
         displayRetained: p.retained,
         displayLost: p.lost,
+        displayNew: p.new || Math.max(0, p.thisYear - p.retained),
         displayRate: p.retentionRate,
         lastYear: p.lastYear,
         thisYear: p.thisYear,
@@ -411,11 +415,13 @@ export default function WayneDashboard({ onLogout }) {
       if (!p.birthYear) return;
 
       const year = p.birthYear;
-      if (!stats[year]) stats[year] = { last: 0, this: 0, retained: 0 };
+      if (!stats[year]) stats[year] = { last: 0, this: 0, retained: 0, lost: 0, new: 0 };
       
       if (p.teamPrior) stats[year].last += 1;
       if (p.teamCurrent) stats[year].this += 1;
       if (p.status === 'Retained') stats[year].retained += 1;
+      if (p.status === 'Lost' && !p.agedOut) stats[year].lost += 1;
+      if (p.status === 'New') stats[year].new += 1;
     });
 
     return Object.keys(stats).map(year => {
@@ -424,6 +430,8 @@ export default function WayneDashboard({ onLogout }) {
         year,
         playersLast: s.last,
         playersThis: s.this,
+        lost: s.lost,
+        new: s.new,
         rate: s.last > 0 ? Math.round((s.retained / s.last) * 100) : 0,
         change: s.last > 0 ? Math.round(((s.this - s.last) / s.last) * 100) : 0
       };
@@ -468,6 +476,26 @@ export default function WayneDashboard({ onLogout }) {
   const netImpact = exactNewRevenue - exactRevenueLost;
   const potentialRecovery = Math.round(exactRevenueLost * 0.3);
 
+  // Player counts for context display
+  const lostPlayersCount = useMemo(() => {
+    return playerList.filter(p => p.status === 'Lost' && !p.agedOut).filter(p => {
+      if (genderFilter === 'boys') return p.gender === 'M';
+      if (genderFilter === 'girls') return p.gender === 'F';
+      return true;
+    }).length;
+  }, [playerList, genderFilter]);
+
+  const newPlayersCount = useMemo(() => {
+    return playerList.filter(p => p.status === 'New').filter(p => {
+      if (genderFilter === 'boys') return p.gender === 'M';
+      if (genderFilter === 'girls') return p.gender === 'F';
+      return true;
+    }).length;
+  }, [playerList, genderFilter]);
+
+  const avgFeeLost = lostPlayersCount > 0 ? Math.round(exactRevenueLost / lostPlayersCount) : Math.round(activeData.fee);
+  const avgFeeNew = newPlayersCount > 0 ? Math.round(exactNewRevenue / newPlayersCount) : Math.round(activeData.fee);
+
   // Gender Pie
   const genderPieData = useMemo(() => {
     if (!kpisGender) return [];
@@ -480,7 +508,7 @@ export default function WayneDashboard({ onLogout }) {
   // Coach Stats
   const coachStats = useMemo(() => {
     if (filteredTeams.length === 0) return { coaches: [], totalRevenueLost: 0, avgFee: 3000 };
-    const avgFee = activeData.fee || 3000;
+    const avgFee = Math.round(activeData.fee || 3000);
     const coachMap = {};
     filteredTeams.forEach(t => {
       const coachName = t.coach || "Unassigned";
@@ -535,6 +563,10 @@ export default function WayneDashboard({ onLogout }) {
 
     if (filter.status) matchedPlayers = matchedPlayers.filter(p => p.status === filter.status);
     if (filter.team) matchedPlayers = matchedPlayers.filter(p => p.teamPrior === filter.team || p.teamCurrent === filter.team);
+    if (filter.coach) {
+      const coachTeams = teams.filter(t => t.coach === filter.coach).map(t => t.name);
+      matchedPlayers = matchedPlayers.filter(p => coachTeams.includes(p.teamPrior) || coachTeams.includes(p.teamCurrent));
+    }
     if (filter.status === 'Lost') matchedPlayers = matchedPlayers.filter(p => !p.agedOut);
 
     if (genderFilter === 'boys') matchedPlayers = matchedPlayers.filter(p => p.gender === 'M');
@@ -706,6 +738,7 @@ export default function WayneDashboard({ onLogout }) {
                         ))}
                       </Bar>
                       <Bar yAxisId="left" dataKey="displayLost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="displayNew" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
                       <Line yAxisId="right" type="monotone" dataKey="displayRate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={3} dot={{ r: 5, fill: COLORS.GREEN_LINE }} />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -724,14 +757,38 @@ export default function WayneDashboard({ onLogout }) {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex justify-center gap-6 mt-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.BOYS }}></div>
-                    <span className="text-xs text-slate-400">Boys</span>
+                <div className="space-y-2 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.BOYS }}></div>
+                      <span className="text-sm text-slate-400">Boys</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 text-sm">{kpisGender?.boys?.totalLast || 0}</span>
+                      <span className="text-slate-500">→</span>
+                      <span className="text-white font-bold">{kpisGender?.boys?.totalThis || 0}</span>
+                      {kpisGender?.boys && (
+                        <span className={`text-xs font-bold ${((kpisGender.boys.totalThis - kpisGender.boys.totalLast) / kpisGender.boys.totalLast * 100) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          ({((kpisGender.boys.totalThis - kpisGender.boys.totalLast) / kpisGender.boys.totalLast * 100) >= 0 ? '+' : ''}{Math.round((kpisGender.boys.totalThis - kpisGender.boys.totalLast) / kpisGender.boys.totalLast * 100)}%)
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.GIRLS }}></div>
-                    <span className="text-xs text-slate-400">Girls</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.GIRLS }}></div>
+                      <span className="text-sm text-slate-400">Girls</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 text-sm">{kpisGender?.girls?.totalLast || 0}</span>
+                      <span className="text-slate-500">→</span>
+                      <span className="text-white font-bold">{kpisGender?.girls?.totalThis || 0}</span>
+                      {kpisGender?.girls && (
+                        <span className={`text-xs font-bold ${((kpisGender.girls.totalThis - kpisGender.girls.totalLast) / kpisGender.girls.totalLast * 100) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          ({((kpisGender.girls.totalThis - kpisGender.girls.totalLast) / kpisGender.girls.totalLast * 100) >= 0 ? '+' : ''}{Math.round((kpisGender.girls.totalThis - kpisGender.girls.totalLast) / kpisGender.girls.totalLast * 100)}%)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -759,6 +816,8 @@ export default function WayneDashboard({ onLogout }) {
                     <Legend wrapperStyle={{ color: '#94a3b8' }} />
                     <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
                     <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill={activeColor} radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="lost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="new" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
                     <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={2} dot={{ r: 4 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -804,7 +863,7 @@ export default function WayneDashboard({ onLogout }) {
                 <div>
                   <p className="text-rose-200 text-xs font-bold uppercase tracking-wider mb-1">Revenue Lost to Churn</p>
                   <h3 className="text-5xl font-black text-white">${exactRevenueLost.toLocaleString()}</h3>
-                  <p className="text-rose-200 text-sm mt-1">Based on actual fee per lost player</p>
+                  <p className="text-rose-200 text-sm mt-1">{lostPlayersCount} lost players × ${avgFeeLost.toLocaleString()} avg fee</p>
                 </div>
               </div>
             </div>
@@ -818,7 +877,7 @@ export default function WayneDashboard({ onLogout }) {
                     <p className="text-2xl font-black text-rose-400">-${exactRevenueLost.toLocaleString()}</p>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500">Revenue from players who didn't return</p>
+                <p className="text-sm text-slate-500">{lostPlayersCount} players × ${avgFeeLost.toLocaleString()} avg</p>
               </div>
 
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
@@ -829,7 +888,7 @@ export default function WayneDashboard({ onLogout }) {
                     <p className="text-2xl font-black text-emerald-400">+${exactNewRevenue.toLocaleString()}</p>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500">Revenue from {activeData.new} new players</p>
+                <p className="text-sm text-slate-500">{newPlayersCount} players × ${avgFeeNew.toLocaleString()} avg</p>
               </div>
 
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
@@ -873,7 +932,7 @@ export default function WayneDashboard({ onLogout }) {
               <div>
                 <h4 className="text-xl font-bold text-white flex items-center gap-2">
                   Current Teams (25/26)
-                  {genderFilter !== 'club' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg">{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
                 <p className="text-slate-400 text-sm">Click on numbers to see player lists • {filteredTeams.length} teams</p>
               </div>
@@ -913,7 +972,7 @@ export default function WayneDashboard({ onLogout }) {
                           <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
                           <td className="py-4 text-center text-slate-400">{team.count}</td>
                           <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)} className="text-blue-400 font-bold hover:underline">{team.retained}</button></td>
-                          <td className="py-4 text-center text-emerald-400 font-bold">{newCount}</td>
+                          <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'New' }, `New: ${team.name}`)} className="text-emerald-400 font-bold hover:underline">{newCount}</button></td>
                           <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Lost' }, `Lost: ${team.name}`)} className="text-rose-400 font-bold hover:underline">{team.lost}</button></td>
                           <td className="py-4 text-center"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : retRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{retRate}%</span></td>
                           <td className="py-4 text-right font-bold text-rose-400">-${(team.lost * team.fee).toLocaleString()}</td>
@@ -977,8 +1036,8 @@ export default function WayneDashboard({ onLogout }) {
                         </td>
                         <td className="py-4 text-center text-slate-400">{coach.teams.length}</td>
                         <td className="py-4 text-center text-slate-400">{coach.totalPlayers}</td>
-                        <td className="py-4 text-center text-blue-400 font-bold">{coach.retained}</td>
-                        <td className="py-4 text-center text-rose-400 font-bold">{coach.lost}</td>
+                        <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ coach: coach.name, status: 'Retained' }, `Retained: ${coach.name}`)} className="text-blue-400 font-bold hover:underline">{coach.retained}</button></td>
+                        <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ coach: coach.name, status: 'Lost' }, `Lost: ${coach.name}`)} className="text-rose-400 font-bold hover:underline">{coach.lost}</button></td>
                         <td className="py-4 text-center"><span className={`px-2.5 py-1 rounded-lg text-sm font-bold ${coach.churnRate <= 30 ? 'bg-emerald-500/20 text-emerald-400' : coach.churnRate <= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{coach.churnRate}%</span></td>
                         <td className="py-4 text-right font-bold text-rose-400">-${coach.revenueLost.toLocaleString()}</td>
                       </tr>
