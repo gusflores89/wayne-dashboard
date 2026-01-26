@@ -666,7 +666,7 @@ export default function WayneDashboard({ onLogout }) {
                 <span className="text-[#82C3FF] font-bold uppercase tracking-widest text-xs">Retention Intelligence</span>
               </div>
             </div>
-            <p className="text-white font-bold text-lg mt-2">Bay Area Surf</p>
+            <p className="text-white font-bold text-lg mt-2">CLUB NAME</p>
             <div className="flex items-center gap-3 mt-2">
               <div className="flex bg-[#111827] p-1 rounded-lg border border-slate-700/50">
                 <button 
