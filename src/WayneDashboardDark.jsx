@@ -236,6 +236,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function WayneDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [genderFilter, setGenderFilter] = useState("club");
+  const [seasonMode, setSeasonMode] = useState("season-vs-season"); // "season-vs-season" or "in-season"
   const [searchTerm, setSearchTerm] = useState("");
   const [modal, setModal] = useState({ open: false, title: "", players: [], subtitle: "" });
   const [selectedEntity, setSelectedEntity] = useState({ type: 'coach', id: '' });
@@ -665,7 +666,23 @@ export default function WayneDashboard({ onLogout }) {
                 <span className="text-[#82C3FF] font-bold uppercase tracking-widest text-xs">Retention Intelligence</span>
               </div>
             </div>
-            <p className="text-slate-400 mt-1 text-sm">Season: <span className="font-bold text-white">2024-25 vs 2025-26</span></p>
+            <p className="text-white font-bold text-lg mt-2">Bay Area Surf</p>
+            <div className="flex items-center gap-3 mt-2">
+              <div className="flex bg-[#111827] p-1 rounded-lg border border-slate-700/50">
+                <button 
+                  onClick={() => setSeasonMode("season-vs-season")}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${seasonMode === "season-vs-season" ? "bg-[#3A7FC3] text-white" : "text-slate-400 hover:text-white"}`}
+                >
+                  24/25 vs 25/26
+                </button>
+                <button 
+                  onClick={() => setSeasonMode("in-season")}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${seasonMode === "in-season" ? "bg-[#3A7FC3] text-white" : "text-slate-400 hover:text-white"}`}
+                >
+                  In-Season
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col items-end gap-3">
@@ -704,8 +721,28 @@ export default function WayneDashboard({ onLogout }) {
         {loading && <div className="text-center p-12 text-slate-400">Loading data...</div>}
         {err && <div className="text-center p-12 text-rose-400">{err}</div>}
 
+        {/* IN-SEASON COMING SOON */}
+        {seasonMode === "in-season" && !loading && !err && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="bg-[#111827] p-10 rounded-3xl border border-[#3A7FC3]/30 text-center max-w-lg">
+              <div className="w-20 h-20 bg-[#3A7FC3]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <TrendingUp size={40} className="text-[#5DB3F5]" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-3">In-Season Tracking</h2>
+              <p className="text-slate-400 mb-6">
+                Track player retention throughout the season with multiple roster uploads. 
+                Compare January vs June, or any point during the year.
+              </p>
+              <div className="bg-[#0a1628] rounded-xl p-4 border border-slate-700/50">
+                <p className="text-[#5DB3F5] font-bold text-sm">Coming Soon</p>
+                <p className="text-slate-500 text-xs mt-1">This feature is currently in development</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* OVERVIEW */}
-        {activeTab === "overview" && !loading && !err && (
+        {activeTab === "overview" && !loading && !err && seasonMode === "season-vs-season" && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
@@ -810,7 +847,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* DIAGNOSIS */}
-        {activeTab === "diagnosis" && !loading && !err && (
+        {activeTab === "diagnosis" && !loading && !err && seasonMode === "season-vs-season" && (
           <div className="space-y-6">
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
@@ -868,7 +905,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* FINANCIALS */}
-        {activeTab === "financials" && !loading && !err && (
+        {activeTab === "financials" && !loading && !err && seasonMode === "season-vs-season" && (
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-rose-600 to-rose-700 p-8 rounded-2xl shadow-lg shadow-rose-500/20">
               <div className="flex items-center gap-5">
@@ -939,7 +976,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* TEAMS */}
-        {activeTab === "full-roster" && !loading && !err && (
+        {activeTab === "full-roster" && !loading && !err && seasonMode === "season-vs-season" && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
@@ -1000,7 +1037,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* COACHES */}
-        {activeTab === "coaches" && !loading && !err && (
+        {activeTab === "coaches" && !loading && !err && seasonMode === "season-vs-season" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-rose-500/10 p-5 rounded-2xl border border-rose-500/30">
@@ -1063,7 +1100,7 @@ export default function WayneDashboard({ onLogout }) {
         )}
 
         {/* DEEP DIVE */}
-        {activeTab === "deep-dive" && !loading && !err && (
+        {activeTab === "deep-dive" && !loading && !err && seasonMode === "season-vs-season" && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <div className="lg:col-span-1 bg-[#111827] p-5 rounded-2xl border border-slate-700/50 h-fit">
               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Select Focus</h4>
