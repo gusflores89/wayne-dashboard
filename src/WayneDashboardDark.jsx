@@ -34,12 +34,12 @@ const URLS = {
 const COLORS = {
   CLUB: "#3A7FC3",
   BOYS: "#3b82f6",
-  GIRLS: "#ec4899",
-  LOST: "#f97316",  // Orange for Lost
+  GIRLS: "#818cf8",  // Indigo/purple - less stereotypical
+  LOST: "#ef4444",   // Red for lost players
   GREEN_LINE: "#10b981",
   NEW: "#10b981",
   GROWTH: "#10b981",
-  RISK: "#f43f5e"
+  RISK: "#ef4444"
 };
 
 /* -------------------------------------------------------------------------- */
@@ -168,7 +168,7 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {p.gender && <span className={`text-xs px-2 py-0.5 rounded ${p.gender === 'M' ? 'bg-[#3A7FC3]/20 text-[#5DB3F5]' : 'bg-pink-500/20 text-pink-400'}`}>{p.gender === 'M' ? '♂' : '♀'}</span>}
+                    {p.gender && <span className={`text-xs px-2 py-0.5 rounded ${p.gender === 'M' ? 'bg-[#3A7FC3]/20 text-[#5DB3F5]' : 'bg-indigo-500/20 text-indigo-400'}`}>{p.gender === 'M' ? '♂' : '♀'}</span>}
                     <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${p.status === 'Lost' ? 'bg-rose-500/20 text-rose-400' : p.status === 'New' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#3A7FC3]/20 text-[#5DB3F5]'}`}>{p.status}</span>
                   </div>
                 </li>
@@ -733,7 +733,7 @@ export default function WayneDashboard({ onLogout }) {
               <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50 lg:col-span-2">
                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                   <ClipboardList size={18} className="text-blue-400" />Retention by Program
-                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -759,7 +759,7 @@ export default function WayneDashboard({ onLogout }) {
               </div>
 
               <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
-                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Users size={18} className="text-pink-400" />Gender Split</h4>
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Users size={18} className="text-indigo-400" />Gender Split</h4>
                 <div className="h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -815,7 +815,7 @@ export default function WayneDashboard({ onLogout }) {
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
                 Retention by Age Group
-                {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
               </h4>
               <p className="text-slate-400 text-sm mb-6">Compare player counts year over year by birth year</p>
               <div className="h-[380px]">
@@ -945,7 +945,7 @@ export default function WayneDashboard({ onLogout }) {
               <div>
                 <h4 className="text-xl font-bold text-white flex items-center gap-2">
                   Current Teams (25/26)
-                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+                  {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
                 <p className="text-slate-400 text-sm">Click on numbers to see player lists • {filteredTeams.length} teams</p>
               </div>
