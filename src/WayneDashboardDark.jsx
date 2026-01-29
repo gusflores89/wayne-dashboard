@@ -34,8 +34,8 @@ const URLS = {
 const COLORS = {
   CLUB: "#3A7FC3",
   BOYS: "#3b82f6",
-  GIRLS: "#818cf8",  // Indigo/purple - less stereotypical
-  LOST: "#ef4444",   // Red for lost players
+  GIRLS: "#818cf8",
+  LOST: "#ef4444",
   GREEN_LINE: "#10b981",
   NEW: "#10b981",
   GROWTH: "#10b981",
@@ -95,14 +95,11 @@ function pick(obj, candidates) {
   return "";
 }
 
-// Helper para detectar género del programa basado en el nombre
 function getProgramGender(programName) {
   const name = (programName || "").toLowerCase();
-  // Girls programs
   if (name.includes("girls") || name === "pre-ecnl") {
     return "F";
   }
-  // Boys programs (MLS Next, NPL, Boys...)
   return "M";
 }
 
@@ -185,6 +182,69 @@ const PlayerModal = ({ isOpen, onClose, title, players, subtitle }) => {
   );
 };
 
+const TeamDetailModal = ({ isOpen, onClose, team }) => {
+  if (!isOpen || !team) return null;
+  
+  const priorDetails = team.teamPriorDetail ? team.teamPriorDetail.split(", ").map(item => {
+    const [name, count] = item.split(":");
+    return { name: name?.trim(), count: parseInt(count) || 0 };
+  }).filter(d => d.name && d.count > 0) : [];
+  
+  const totalFromPrior = priorDetails.reduce((sum, d) => sum + d.count, 0);
+  
+  const coaches = team.coachPrior ? team.coachPrior.split(", ").filter(c => c.trim()) : [];
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#070D1F] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-[#3A7FC3]/50">
+        <div className="p-5 border-b border-[#3A7FC3]/30 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-white text-lg">{team.name}</h3>
+            <p className="text-xs text-slate-400">{team.program} • Coach: {team.coach}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-[#3A7FC3]/20 rounded-lg transition-colors text-slate-400 hover:text-white"><X size={20} /></button>
+        </div>
+        
+        <div className="p-5 max-h-[60vh] overflow-y-auto">
+          {priorDetails.length > 0 ? (
+            <>
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Players came from:</h4>
+              <div className="space-y-2 mb-6">
+                {priorDetails.sort((a, b) => b.count - a.count).map((d, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-[#0C1B46] rounded-xl border border-[#3A7FC3]/20">
+                    <span className="text-white text-sm">{d.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold">{d.count}</span>
+                      <span className="text-slate-500 text-xs">({totalFromPrior > 0 ? Math.round((d.count / totalFromPrior) * 100) : 0}%)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {coaches.length > 0 && (
+                <>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Previous coaches:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {coaches.map((c, idx) => (
+                      <span key={idx} className="px-3 py-1.5 bg-[#0C1B46] rounded-lg text-sm text-[#5DB3F5] border border-[#3A7FC3]/20">{c}</span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="text-center text-slate-500 text-sm py-8">No transition data available for this team.</p>
+          )}
+        </div>
+        
+        <div className="p-4 bg-[#0C1B46] border-t border-[#3A7FC3]/30 flex justify-end">
+          <button onClick={onClose} className="text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Scorecard = ({ label, value, sub, highlight, colorClass = "" }) => (
   <div className={`p-6 rounded-2xl flex flex-col justify-center transition-all duration-300 border ${
     highlight ? "bg-gradient-to-br from-[#3A7FC3] to-[#2F6DB3] border-[#5DB3F5]/50 shadow-lg shadow-[#3A7FC3]/20" : "bg-[#070D1F] border-[#3A7FC3]/30"
@@ -236,19 +296,19 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function WayneDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [genderFilter, setGenderFilter] = useState("club");
-  const [seasonMode, setSeasonMode] = useState("season-vs-season"); // "season-vs-season" or "in-season"
+  const [seasonMode, setSeasonMode] = useState("season-vs-season");
   const [searchTerm, setSearchTerm] = useState("");
   const [modal, setModal] = useState({ open: false, title: "", players: [], subtitle: "" });
+  const [teamModal, setTeamModal] = useState({ open: false, team: null });
   const [selectedEntity, setSelectedEntity] = useState({ type: 'coach', id: '' });
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   const [kpisGender, setKpisGender] = useState(null);
-  const [programs, setPrograms] = useState([]); // NEW: Programs from new sheet
+  const [programs, setPrograms] = useState([]);
   const [teams, setTeams] = useState([]);
   const [playerList, setPlayerList] = useState([]);
 
-  // Determine current active color
   const activeColor = genderFilter === 'boys' ? COLORS.BOYS : genderFilter === 'girls' ? COLORS.GIRLS : COLORS.CLUB;
 
   useEffect(() => {
@@ -257,7 +317,7 @@ export default function WayneDashboard({ onLogout }) {
       try {
         const responses = await Promise.all([
           fetch(URLS.KPIS_GENDER).then(res => res.text()),
-          fetch(URLS.PROGRAMS).then(res => res.text()), // NEW: Fetch programs
+          fetch(URLS.PROGRAMS).then(res => res.text()),
           fetch(URLS.TEAMS).then(res => res.text()),
           fetch(URLS.PLAYERS).then(res => res.text()),
         ]);
@@ -282,8 +342,7 @@ export default function WayneDashboard({ onLogout }) {
         });
         setKpisGender(kpiMap);
 
-        // NEW: Programs from new sheet structure
-        // Columns: name, retained, lost, lastYear, thisYear, retentionRate, churn
+        // Programs
         const programRows = rowsToObjects(parseCSV(programText));
         const parsedPrograms = programRows.map(r => {
           const name = pick(r, ["name", "Name"]) || "";
@@ -295,12 +354,12 @@ export default function WayneDashboard({ onLogout }) {
             lost: toNumber(pick(r, ["lost", "Lost"])),
             lastYear: toNumber(pick(r, ["lastYear", "LastYear", "last_year"])),
             thisYear,
-            new: Math.max(0, thisYear - retained),  // Calculate new players
+            new: Math.max(0, thisYear - retained),
             retentionRate: toNumber(pick(r, ["retentionRate", "RetentionRate", "retention_rate"])),
             churn: toNumber(pick(r, ["churn", "Churn"])),
-            gender: getProgramGender(name) // Auto-detect gender from name
+            gender: getProgramGender(name)
           };
-        }).filter(p => p.name); // Filter out empty rows
+        }).filter(p => p.name);
         setPrograms(parsedPrograms);
 
         // Teams
@@ -320,7 +379,9 @@ export default function WayneDashboard({ onLogout }) {
             retained: toNumber(pick(r, ["retained"])),
             lost: toNumber(pick(r, ["lost"])),
             gender,
-            fee: toNumber(pick(r, ["Fee"])) || 3000
+            fee: toNumber(pick(r, ["Fee"])) || 3000,
+            teamPriorDetail: pick(r, ["team_prior_detail"]) || "",
+            coachPrior: pick(r, ["coach_prior"]) || ""
           };
         }).filter(t => !t.name.toLowerCase().includes("goalkeeper")));
 
@@ -340,7 +401,6 @@ export default function WayneDashboard({ onLogout }) {
           const birthYear = pick(r, ["birth_year", "Age Group (Last Yr)"]) || "";
           const program = pick(r, ["program_current", "program_this", "Program (This Yr)", "program"]) || pick(r, ["program_prior", "program_last", "Program (Last Yr)"]) || "Unknown";
 
-          // Read both fees for proper calculation
           const feePrior = toNumber(pick(r, ["fee_prior", "fee_last"]));
           const feeCurrent = toNumber(pick(r, ["fee_current", "fee_this", "fee", "Fee"]));
 
@@ -355,7 +415,6 @@ export default function WayneDashboard({ onLogout }) {
             program,
             feePrior,
             feeCurrent,
-            // Use appropriate fee based on status
             fee: status === 'Lost' ? feePrior : feeCurrent
           };
         }));
@@ -381,8 +440,6 @@ export default function WayneDashboard({ onLogout }) {
   const eligibleRetentionPercent = (activeData.totalLast - agedOut) > 0 ? Math.round((activeData.retained / (activeData.totalLast - agedOut)) * 100) : 0;
   const changePercent = activeData.totalLast > 0 ? Math.round(((activeData.totalThis - activeData.totalLast) / activeData.totalLast) * 100) : 0;
 
-  // --- DYNAMIC CALCULATIONS ---
-
   // Calculate new players by program from playerList
   const newByProgram = useMemo(() => {
     const counts = {};
@@ -396,13 +453,13 @@ export default function WayneDashboard({ onLogout }) {
     return counts;
   }, [playerList, genderFilter]);
 
-  // NEW: Retention by PROGRAM (from new sheet data)
+  // Retention by PROGRAM
   const filteredPrograms = useMemo(() => {
     return programs
       .filter(p => {
         if (genderFilter === 'boys') return p.gender === 'M';
         if (genderFilter === 'girls') return p.gender === 'F';
-        return true; // Club shows all
+        return true;
       })
       .map(p => ({
         name: p.name,
@@ -414,7 +471,6 @@ export default function WayneDashboard({ onLogout }) {
         thisYear: p.thisYear,
         churn: p.churn,
         gender: p.gender,
-        // Color based on gender
         barColor: p.gender === 'F' ? COLORS.GIRLS : COLORS.BOYS
       }))
       .sort((a, b) => b.displayRetained - a.displayRetained);
@@ -488,7 +544,6 @@ export default function WayneDashboard({ onLogout }) {
   }, [playerList, genderFilter, activeData.fee]);
 
   const netImpact = exactNewRevenue - exactRevenueLost;
-  const potentialRecovery = Math.round(exactRevenueLost * 0.3);
 
   // Player counts for context display
   const lostPlayersCount = useMemo(() => {
@@ -506,9 +561,6 @@ export default function WayneDashboard({ onLogout }) {
       return true;
     }).length;
   }, [playerList, genderFilter]);
-
-  const avgFeeLost = lostPlayersCount > 0 ? Math.round(exactRevenueLost / lostPlayersCount) : Math.round(activeData.fee);
-  const avgFeeNew = newPlayersCount > 0 ? Math.round(exactNewRevenue / newPlayersCount) : Math.round(activeData.fee);
 
   // Gender Pie
   const genderPieData = useMemo(() => {
@@ -594,7 +646,6 @@ export default function WayneDashboard({ onLogout }) {
     });
   };
 
-  // FIX: Added missing handleExportLostOnly function
   const handleExportLostOnly = () => {
     const lostPlayers = playerList
       .filter(p => p.status === 'Lost' && !p.agedOut)
@@ -652,6 +703,7 @@ export default function WayneDashboard({ onLogout }) {
   return (
     <div className="min-h-screen bg-[#0C1B46] p-4 md:p-6 font-sans text-white">
       <PlayerModal isOpen={modal.open} onClose={() => setModal({ ...modal, open: false })} title={modal.title} players={modal.players} subtitle={modal.subtitle} />
+      <TeamDetailModal isOpen={teamModal.open} onClose={() => setTeamModal({ open: false, team: null })} team={teamModal.team} />
 
       <div className="max-w-7xl mx-auto">
         {/* HEADER */}
@@ -666,7 +718,7 @@ export default function WayneDashboard({ onLogout }) {
                 <span className="text-[#82C3FF] font-bold uppercase tracking-widest text-xs">Retention Intelligence</span>
               </div>
             </div>
-            <p className="text-white font-bold text-lg mt-2">CLUB NAME</p>
+            <p className="text-white font-bold text-lg mt-2">Bay Area Surf</p>
             <div className="flex items-center gap-3 mt-2">
               <div className="flex bg-[#111827] p-1 rounded-lg border border-slate-700/50">
                 <button 
@@ -761,12 +813,12 @@ export default function WayneDashboard({ onLogout }) {
               <KPIBox title="New Players" value={activeData.new.toLocaleString()} sub="First time this season"
                 icon={UserPlus} color="bg-emerald-600" trend="up" clickable onClick={() => handleOpenPlayerList({ status: 'New' }, 'New Players')} />
               <KPIBox title="Eligible Retention" value={`${eligibleRetentionPercent}%`} 
-                sub={`Retained ÷ (${activeData.totalLast} - ${agedOut} aged out)`} icon={Target} color="bg-indigo-600" 
+                sub={`${activeData.retained} of ${activeData.totalLast - agedOut} eligible players`} icon={Target} color="bg-indigo-600" 
                 tooltip="Retention rate excluding aged out" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-              {/* RETENTION BY PROGRAM - NEW IMPLEMENTATION */}
+              {/* RETENTION BY PROGRAM */}
               <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50 lg:col-span-2">
                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                   <ClipboardList size={18} className="text-blue-400" />Retention by Program
@@ -781,12 +833,7 @@ export default function WayneDashboard({ onLogout }) {
                       <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                      {/* Dynamic bar colors based on gender */}
-                      <Bar yAxisId="left" dataKey="displayRetained" name="Retained" radius={[4, 4, 0, 0]}>
-                        {filteredPrograms.map((entry, index) => (
-                          <Cell key={`cell-ret-${index}`} fill={entry.barColor} />
-                        ))}
-                      </Bar>
+                      <Bar yAxisId="left" dataKey="displayRetained" name="Retained" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                       <Bar yAxisId="left" dataKey="displayLost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
                       <Bar yAxisId="left" dataKey="displayNew" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
                       <Line yAxisId="right" type="monotone" dataKey="displayRate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={3} dot={{ r: 5, fill: COLORS.GREEN_LINE }} />
@@ -913,7 +960,7 @@ export default function WayneDashboard({ onLogout }) {
                 <div>
                   <p className="text-rose-200 text-xs font-bold uppercase tracking-wider mb-1">Revenue Lost to Churn</p>
                   <h3 className="text-5xl font-black text-white">${exactRevenueLost.toLocaleString()}</h3>
-                  <p className="text-rose-200 text-sm mt-1">{lostPlayersCount} lost players × ${avgFeeLost.toLocaleString()} avg fee</p>
+                  <p className="text-rose-200 text-sm mt-1">{lostPlayersCount} players × actual fees</p>
                 </div>
               </div>
             </div>
@@ -927,7 +974,7 @@ export default function WayneDashboard({ onLogout }) {
                     <p className="text-2xl font-black text-rose-400">-${exactRevenueLost.toLocaleString()}</p>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500">{lostPlayersCount} players × ${avgFeeLost.toLocaleString()} avg</p>
+                <p className="text-sm text-slate-500">{lostPlayersCount} players × actual fees</p>
               </div>
 
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
@@ -938,7 +985,7 @@ export default function WayneDashboard({ onLogout }) {
                     <p className="text-2xl font-black text-emerald-400">+${exactNewRevenue.toLocaleString()}</p>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500">{newPlayersCount} players × ${avgFeeNew.toLocaleString()} avg</p>
+                <p className="text-sm text-slate-500">{newPlayersCount} players × actual fees</p>
               </div>
 
               <div className="bg-[#111827] p-5 rounded-2xl border border-slate-700/50">
@@ -984,7 +1031,7 @@ export default function WayneDashboard({ onLogout }) {
                   Current Teams (25/26)
                   {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
-                <p className="text-slate-400 text-sm">Click on numbers to see player lists • {filteredTeams.length} teams</p>
+                <p className="text-slate-400 text-sm">Click on team name for details • {filteredTeams.length} teams</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="relative w-full md:w-72">
@@ -1018,7 +1065,12 @@ export default function WayneDashboard({ onLogout }) {
                       const newCount = Math.max(0, team.count - team.retained);
                       return (
                         <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="py-4 pr-4"><div className="font-bold text-white">{team.name}</div><div className="text-xs text-blue-400">{team.program}</div></td>
+                          <td className="py-4 pr-4">
+                            <button onClick={() => setTeamModal({ open: true, team })} className="text-left">
+                              <div className="font-bold text-white hover:text-[#5DB3F5] transition-colors">{team.name}</div>
+                              <div className="text-xs text-blue-400">{team.program}</div>
+                            </button>
+                          </td>
                           <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
                           <td className="py-4 text-center text-slate-400">{team.count}</td>
                           <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)} className="text-blue-400 font-bold hover:underline">{team.retained}</button></td>
