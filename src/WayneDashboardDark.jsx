@@ -27,6 +27,7 @@ const URLS = {
   PROGRAMS: getEnvVar("VITE_SHEET_PROGRAMS_CSV"),
   AGE: getEnvVar("VITE_SHEET_AGE_CSV"),
   TEAMS: getEnvVar("VITE_SHEET_TEAMS_CSV"),
+  TEAMS_PRIOR: getEnvVar("VITE_SHEET_TEAMS_PRIOR_CSV"),
   PLAYERS: getEnvVar("VITE_SHEET_PLAYERS_CSV")
 };
 
@@ -200,7 +201,7 @@ const TeamDetailModal = ({ isOpen, onClose, team }) => {
         <div className="p-5 border-b border-[#3A7FC3]/30 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-white text-lg">{team.name}</h3>
-            <p className="text-xs text-slate-400">{team.program} • Coach: {team.coach}</p>
+            <p className="text-xs text-slate-400">{team.program} • Coach: {team.coach} • 25/26 Season</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-[#3A7FC3]/20 rounded-lg transition-colors text-slate-400 hover:text-white"><X size={20} /></button>
         </div>
@@ -234,6 +235,95 @@ const TeamDetailModal = ({ isOpen, onClose, team }) => {
             </>
           ) : (
             <p className="text-center text-slate-500 text-sm py-8">No transition data available for this team.</p>
+          )}
+        </div>
+        
+        <div className="p-4 bg-[#0C1B46] border-t border-[#3A7FC3]/30 flex justify-end">
+          <button onClick={onClose} className="text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TeamPriorDetailModal = ({ isOpen, onClose, team, playerList }) => {
+  if (!isOpen || !team) return null;
+  
+  // Calculate where players went
+  const destinations = useMemo(() => {
+    const teamPlayers = playerList.filter(p => p.teamPrior === team.name);
+    const destCounts = {};
+    
+    teamPlayers.forEach(p => {
+      if (p.status === 'Retained' && p.teamCurrent) {
+        const dest = p.teamCurrent;
+        if (!destCounts[dest]) destCounts[dest] = { name: dest, count: 0 };
+        destCounts[dest].count += 1;
+      }
+    });
+    
+    return Object.values(destCounts).sort((a, b) => b.count - a.count);
+  }, [team, playerList]);
+  
+  const totalRetained = destinations.reduce((sum, d) => sum + d.count, 0);
+  
+  // Lost players
+  const lostPlayers = playerList.filter(p => p.teamPrior === team.name && p.status === 'Lost' && !p.agedOut);
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#070D1F] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-[#3A7FC3]/50">
+        <div className="p-5 border-b border-[#3A7FC3]/30 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-white text-lg">{team.name}</h3>
+            <p className="text-xs text-slate-400">{team.program} • Coach: {team.coach} • 24/25 Season</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-[#3A7FC3]/20 rounded-lg transition-colors text-slate-400 hover:text-white"><X size={20} /></button>
+        </div>
+        
+        <div className="p-5 max-h-[60vh] overflow-y-auto">
+          {/* Stats Summary */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="bg-[#0C1B46] rounded-xl p-3 text-center border border-[#3A7FC3]/20">
+              <p className="text-2xl font-bold text-white">{team.count}</p>
+              <p className="text-xs text-slate-500">Players</p>
+            </div>
+            <div className="bg-[#0C1B46] rounded-xl p-3 text-center border border-emerald-500/20">
+              <p className="text-2xl font-bold text-emerald-400">{team.retained}</p>
+              <p className="text-xs text-slate-500">Retained</p>
+            </div>
+            <div className="bg-[#0C1B46] rounded-xl p-3 text-center border border-rose-500/20">
+              <p className="text-2xl font-bold text-rose-400">{team.lost}</p>
+              <p className="text-xs text-slate-500">Lost</p>
+            </div>
+          </div>
+
+          {/* Where players went */}
+          {destinations.length > 0 ? (
+            <>
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Players went to:</h4>
+              <div className="space-y-2 mb-6">
+                {destinations.map((d, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-[#0C1B46] rounded-xl border border-emerald-500/20">
+                    <span className="text-white text-sm">{d.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-400 font-bold">{d.count}</span>
+                      <span className="text-slate-500 text-xs">({totalRetained > 0 ? Math.round((d.count / totalRetained) * 100) : 0}%)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-slate-500 text-sm py-4">No retention data available.</p>
+          )}
+          
+          {/* Lost players count */}
+          {lostPlayers.length > 0 && (
+            <div className="bg-rose-500/10 rounded-xl p-4 border border-rose-500/20">
+              <p className="text-rose-400 font-bold">{lostPlayers.length} players lost</p>
+              <p className="text-xs text-slate-500">Did not return to any team in 25/26</p>
+            </div>
           )}
         </div>
         
@@ -300,6 +390,8 @@ export default function WayneDashboard({ onLogout }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [modal, setModal] = useState({ open: false, title: "", players: [], subtitle: "" });
   const [teamModal, setTeamModal] = useState({ open: false, team: null });
+  const [teamPriorModal, setTeamPriorModal] = useState({ open: false, team: null });
+  const [teamsSubTab, setTeamsSubTab] = useState("current");
   const [selectedEntity, setSelectedEntity] = useState({ type: 'coach', id: '' });
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -307,6 +399,7 @@ export default function WayneDashboard({ onLogout }) {
   const [kpisGender, setKpisGender] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [teamsPrior, setTeamsPrior] = useState([]);
   const [playerList, setPlayerList] = useState([]);
 
   const activeColor = genderFilter === 'boys' ? COLORS.BOYS : genderFilter === 'girls' ? COLORS.GIRLS : COLORS.CLUB;
@@ -319,10 +412,11 @@ export default function WayneDashboard({ onLogout }) {
           fetch(URLS.KPIS_GENDER).then(res => res.text()),
           fetch(URLS.PROGRAMS).then(res => res.text()),
           fetch(URLS.TEAMS).then(res => res.text()),
+          fetch(URLS.TEAMS_PRIOR).then(res => res.text()).catch(() => ""),
           fetch(URLS.PLAYERS).then(res => res.text()),
         ]);
 
-        const [kpiText, programText, teamText, playerText] = responses;
+        const [kpiText, programText, teamText, teamPriorText, playerText] = responses;
 
         // KPIs
         const kpiRows = rowsToObjects(parseCSV(kpiText));
@@ -362,7 +456,7 @@ export default function WayneDashboard({ onLogout }) {
         }).filter(p => p.name);
         setPrograms(parsedPrograms);
 
-        // Teams
+        // Teams (Current 25/26)
         const teamRows = rowsToObjects(parseCSV(teamText));
         setTeams(teamRows.map(r => {
           const name = pick(r, ["name"]) || "";
@@ -384,6 +478,30 @@ export default function WayneDashboard({ onLogout }) {
             coachPrior: pick(r, ["coach_prior"]) || ""
           };
         }).filter(t => !t.name.toLowerCase().includes("goalkeeper")));
+
+        // Teams Prior (24/25)
+        if (teamPriorText) {
+          const teamPriorRows = rowsToObjects(parseCSV(teamPriorText));
+          setTeamsPrior(teamPriorRows.map(r => {
+            const name = pick(r, ["name"]) || "";
+            let gender = pick(r, ["gender"]) || "";
+            if (gender.toUpperCase() === 'M') gender = 'M';
+            else if (gender.toUpperCase() === 'F') gender = 'F';
+            else gender = name.toLowerCase().includes("girl") ? 'F' : 'M';
+            
+            return {
+              name,
+              program: pick(r, ["program"]),
+              coach: pick(r, ["coach"]) || "Unassigned",
+              count: toNumber(pick(r, ["count"])),
+              retained: toNumber(pick(r, ["retained"])),
+              lost: toNumber(pick(r, ["lost"])),
+              rate: toNumber(pick(r, ["rate"])),
+              gender,
+              fee: toNumber(pick(r, ["Fee"])) || 3000,
+            };
+          }).filter(t => t.name && !t.name.toLowerCase().includes("goalkeeper")));
+        }
 
         // Players
         const playerRows = rowsToObjects(parseCSV(playerText));
@@ -510,7 +628,7 @@ export default function WayneDashboard({ onLogout }) {
     .filter(a => a.playersLast > 0 || a.playersThis > 0);
   }, [playerList, genderFilter]);
 
-  // Filtered Teams
+  // Filtered Teams (Current 25/26)
   const filteredTeams = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return teams.filter((t) => {
@@ -521,6 +639,18 @@ export default function WayneDashboard({ onLogout }) {
       return matchesSearch && matchesGender;
     });
   }, [teams, searchTerm, genderFilter]);
+
+  // Filtered Teams Prior (24/25)
+  const filteredTeamsPrior = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    return teamsPrior.filter((t) => {
+      const matchesSearch = (t.name || "").toLowerCase().includes(q) || (t.coach || "").toLowerCase().includes(q);
+      let matchesGender = true;
+      if (genderFilter === 'boys') matchesGender = t.gender === 'M';
+      else if (genderFilter === 'girls') matchesGender = t.gender === 'F';
+      return matchesSearch && matchesGender;
+    });
+  }, [teamsPrior, searchTerm, genderFilter]);
 
   // Revenue Calculations
   const exactRevenueLost = useMemo(() => {
@@ -704,6 +834,7 @@ export default function WayneDashboard({ onLogout }) {
     <div className="min-h-screen bg-[#0C1B46] p-4 md:p-6 font-sans text-white">
       <PlayerModal isOpen={modal.open} onClose={() => setModal({ ...modal, open: false })} title={modal.title} players={modal.players} subtitle={modal.subtitle} />
       <TeamDetailModal isOpen={teamModal.open} onClose={() => setTeamModal({ open: false, team: null })} team={teamModal.team} />
+      <TeamPriorDetailModal isOpen={teamPriorModal.open} onClose={() => setTeamPriorModal({ open: false, team: null })} team={teamPriorModal.team} playerList={playerList} />
 
       <div className="max-w-7xl mx-auto">
         {/* HEADER */}
@@ -1022,16 +1153,16 @@ export default function WayneDashboard({ onLogout }) {
           </div>
         )}
 
-        {/* TEAMS */}
+        {/* TEAMS - WITH SUB-TABS */}
         {activeTab === "full-roster" && !loading && !err && seasonMode === "season-vs-season" && (
           <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
                 <h4 className="text-xl font-bold text-white flex items-center gap-2">
-                  Current Teams (25/26)
+                  Teams
                   {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
                 </h4>
-                <p className="text-slate-400 text-sm">Click on team name for details • {filteredTeams.length} teams</p>
+                <p className="text-slate-400 text-sm">Click on team name for details</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="relative w-full md:w-72">
@@ -1039,51 +1170,134 @@ export default function WayneDashboard({ onLogout }) {
                   <input type="text" placeholder="Search team or coach..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full bg-[#0a1628] border border-slate-600/50 rounded-xl py-2.5 pl-10 pr-4 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
                 </div>
-                <button onClick={() => exportToExcel(filteredTeams, 'Teams_Export')} className="p-2.5 bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"><FileSpreadsheet size={18} /></button>
+                <button onClick={() => exportToExcel(teamsSubTab === 'current' ? filteredTeams : filteredTeamsPrior, `Teams_${teamsSubTab}_Export`)} className="p-2.5 bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"><FileSpreadsheet size={18} /></button>
               </div>
             </div>
-            
-            {filteredTeams.length === 0 ? <div className="text-center py-12 text-slate-500"><Users size={48} className="mx-auto mb-4 opacity-50" /><p>No teams found</p></div> : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-slate-700/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                      <th className="pb-3 pr-4">Team</th>
-                      <th className="pb-3 pr-4">Coach</th>
-                      <th className="pb-3 text-center">Players</th>
-                      <th className="pb-3 text-center">Retained</th>
-                      <th className="pb-3 text-center text-emerald-400">New</th>
-                      <th className="pb-3 text-center">Lost</th>
-                      <th className="pb-3 text-center">Rate</th>
-                      <th className="pb-3 text-right">Revenue Lost</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {filteredTeams.map((team, idx) => {
-                      const total = team.retained + team.lost;
-                      const retRate = total > 0 ? Math.round((team.retained / total) * 100) : 0;
-                      const newCount = Math.max(0, team.count - team.retained);
-                      return (
-                        <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="py-4 pr-4">
-                            <button onClick={() => setTeamModal({ open: true, team })} className="text-left">
-                              <div className="font-bold text-white hover:text-[#5DB3F5] transition-colors">{team.name}</div>
-                              <div className="text-xs text-blue-400">{team.program}</div>
-                            </button>
-                          </td>
-                          <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
-                          <td className="py-4 text-center text-slate-400">{team.count}</td>
-                          <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)} className="text-blue-400 font-bold hover:underline">{team.retained}</button></td>
-                          <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'New' }, `New: ${team.name}`)} className="text-emerald-400 font-bold hover:underline">{newCount}</button></td>
-                          <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Lost' }, `Lost: ${team.name}`)} className="text-rose-400 font-bold hover:underline">{team.lost}</button></td>
-                          <td className="py-4 text-center"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : retRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{retRate}%</span></td>
-                          <td className="py-4 text-right font-bold text-rose-400">-${(team.lost * team.fee).toLocaleString()}</td>
+
+            {/* Sub-tabs for Current vs Prior */}
+            <div className="flex gap-2 mb-6">
+              <button
+                onClick={() => setTeamsSubTab("current")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  teamsSubTab === "current" 
+                    ? "bg-[#3A7FC3] text-white" 
+                    : "bg-slate-700/50 text-slate-400 hover:text-white"
+                }`}
+              >
+                Current (25/26)
+              </button>
+              <button
+                onClick={() => setTeamsSubTab("prior")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  teamsSubTab === "prior" 
+                    ? "bg-[#3A7FC3] text-white" 
+                    : "bg-slate-700/50 text-slate-400 hover:text-white"
+                }`}
+              >
+                Prior (24/25)
+              </button>
+            </div>
+
+            {/* Current Teams Table (25/26) */}
+            {teamsSubTab === "current" && (
+              <>
+                <p className="text-slate-500 text-xs mb-4">{filteredTeams.length} teams</p>
+                {filteredTeams.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <Users size={48} className="mx-auto mb-4 opacity-50" />
+                    <p>No teams found</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-slate-700/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                          <th className="pb-3 pr-4">Team</th>
+                          <th className="pb-3 pr-4">Coach</th>
+                          <th className="pb-3 text-center">Players</th>
+                          <th className="pb-3 text-center">Retained</th>
+                          <th className="pb-3 text-center text-emerald-400">New</th>
+                          <th className="pb-3 text-center">Lost</th>
+                          <th className="pb-3 text-center">Rate</th>
+                          <th className="pb-3 text-right">Revenue Lost</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/30">
+                        {filteredTeams.map((team, idx) => {
+                          const total = team.retained + team.lost;
+                          const retRate = total > 0 ? Math.round((team.retained / total) * 100) : 0;
+                          const newCount = Math.max(0, team.count - team.retained);
+                          return (
+                            <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
+                              <td className="py-4 pr-4">
+                                <button onClick={() => setTeamModal({ open: true, team })} className="text-left">
+                                  <div className="font-bold text-white hover:text-[#5DB3F5] transition-colors">{team.name}</div>
+                                  <div className="text-xs text-blue-400">{team.program}</div>
+                                </button>
+                              </td>
+                              <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
+                              <td className="py-4 text-center text-slate-400">{team.count}</td>
+                              <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Retained' }, `Retained: ${team.name}`)} className="text-blue-400 font-bold hover:underline">{team.retained}</button></td>
+                              <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'New' }, `New: ${team.name}`)} className="text-emerald-400 font-bold hover:underline">{newCount}</button></td>
+                              <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Lost' }, `Lost: ${team.name}`)} className="text-rose-400 font-bold hover:underline">{team.lost}</button></td>
+                              <td className="py-4 text-center"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : retRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{retRate}%</span></td>
+                              <td className="py-4 text-right font-bold text-rose-400">-${(team.lost * team.fee).toLocaleString()}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Prior Teams Table (24/25) */}
+            {teamsSubTab === "prior" && (
+              <>
+                <p className="text-slate-500 text-xs mb-4">{filteredTeamsPrior.length} teams</p>
+                {filteredTeamsPrior.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <Users size={48} className="mx-auto mb-4 opacity-50" />
+                    <p>No teams found. Make sure to publish the teams_prior sheet as CSV and add VITE_SHEET_TEAMS_PRIOR_CSV to Vercel.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-slate-700/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                          <th className="pb-3 pr-4">Team (24/25)</th>
+                          <th className="pb-3 pr-4">Coach</th>
+                          <th className="pb-3 text-center">Players</th>
+                          <th className="pb-3 text-center text-emerald-400">Retained</th>
+                          <th className="pb-3 text-center text-rose-400">Lost</th>
+                          <th className="pb-3 text-center">Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/30">
+                        {filteredTeamsPrior.map((team, idx) => {
+                          const retRate = team.count > 0 ? Math.round((team.retained / team.count) * 100) : 0;
+                          return (
+                            <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
+                              <td className="py-4 pr-4">
+                                <button onClick={() => setTeamPriorModal({ open: true, team })} className="text-left">
+                                  <div className="font-bold text-white hover:text-[#5DB3F5] transition-colors">{team.name}</div>
+                                  <div className="text-xs text-blue-400">{team.program}</div>
+                                </button>
+                              </td>
+                              <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
+                              <td className="py-4 text-center text-slate-400">{team.count}</td>
+                              <td className="py-4 text-center"><span className="text-emerald-400 font-bold">{team.retained}</span></td>
+                              <td className="py-4 text-center"><span className="text-rose-400 font-bold">{team.lost}</span></td>
+                              <td className="py-4 text-center"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : retRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{retRate}%</span></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
