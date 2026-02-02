@@ -701,6 +701,57 @@ export default function WayneDashboard({ onLogout }) {
     ];
   }, [kpisGender]);
 
+  // Program Distribution Pie Charts (Lost, Retained, New)
+  const programDistribution = useMemo(() => {
+    const PROGRAM_COLORS = [
+      '#818cf8', // indigo
+      '#38bdf8', // cyan  
+      '#34d399', // emerald
+      '#fbbf24', // amber
+      '#f87171', // red
+      '#a78bfa', // purple
+      '#94a3b8', // slate
+    ];
+    
+    const lostByProgram = {};
+    const retainedByProgram = {};
+    const newByProgram = {};
+    
+    playerList.forEach(p => {
+      // Apply gender filter
+      if (genderFilter === 'boys' && p.gender !== 'M') return;
+      if (genderFilter === 'girls' && p.gender !== 'F') return;
+      
+      const prog = p.program || 'Unknown';
+      
+      if (p.status === 'Lost' && !p.agedOut) {
+        lostByProgram[prog] = (lostByProgram[prog] || 0) + 1;
+      } else if (p.status === 'Retained') {
+        retainedByProgram[prog] = (retainedByProgram[prog] || 0) + 1;
+      } else if (p.status === 'New') {
+        newByProgram[prog] = (newByProgram[prog] || 0) + 1;
+      }
+    });
+    
+    const toChartData = (obj) => {
+      const total = Object.values(obj).reduce((sum, v) => sum + v, 0);
+      return Object.entries(obj)
+        .map(([name, value], idx) => ({
+          name,
+          value,
+          percent: total > 0 ? Math.round((value / total) * 100) : 0,
+          color: PROGRAM_COLORS[idx % PROGRAM_COLORS.length]
+        }))
+        .sort((a, b) => b.value - a.value);
+    };
+    
+    return {
+      lost: toChartData(lostByProgram),
+      retained: toChartData(retainedByProgram),
+      new: toChartData(newByProgram)
+    };
+  }, [playerList, genderFilter]);
+
   // Coach Stats
   const coachStats = useMemo(() => {
     if (filteredTeams.length === 0) return { coaches: [], totalRevenueLost: 0, avgFee: 3000 };
@@ -849,7 +900,7 @@ export default function WayneDashboard({ onLogout }) {
                 <span className="text-[#82C3FF] font-bold uppercase tracking-widest text-xs">Retention Intelligence</span>
               </div>
             </div>
-            <p className="text-white font-bold text-lg mt-2">Bay Area Surf</p>
+            <p className="text-white font-bold text-lg mt-2">Demo</p>
             <div className="flex items-center gap-3 mt-2">
               <div className="flex bg-[#111827] p-1 rounded-lg border border-slate-700/50">
                 <button 
@@ -1017,6 +1068,126 @@ export default function WayneDashboard({ onLogout }) {
                         </span>
                       )}
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Program Distribution - Lost, Retained, New */}
+            <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
+              <h4 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                <ClipboardList size={18} className="text-blue-400" />
+                By Program
+                {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+              </h4>
+              <p className="text-slate-400 text-sm mb-6">Where the bulk of Lost, Retained, and New players come from</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Lost Pie */}
+                <div className="text-center">
+                  <h5 className="text-rose-400 font-bold mb-3">Lost</h5>
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={programDistribution.lost} 
+                          cx="50%" 
+                          cy="50%" 
+                          outerRadius={80} 
+                          dataKey="value"
+                          label={({ percent }) => `${percent}%`}
+                          labelLine={false}
+                        >
+                          {programDistribution.lost.map((entry, index) => (
+                            <Cell key={`cell-lost-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    {programDistribution.lost.slice(0, 5).map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
+                          <span className="text-slate-400 truncate max-w-[100px]">{item.name}</span>
+                        </div>
+                        <span className="text-white font-medium">{item.percent}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Retained Pie */}
+                <div className="text-center">
+                  <h5 className="text-slate-300 font-bold mb-3">Retained</h5>
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={programDistribution.retained} 
+                          cx="50%" 
+                          cy="50%" 
+                          outerRadius={80} 
+                          dataKey="value"
+                          label={({ percent }) => `${percent}%`}
+                          labelLine={false}
+                        >
+                          {programDistribution.retained.map((entry, index) => (
+                            <Cell key={`cell-retained-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    {programDistribution.retained.slice(0, 5).map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
+                          <span className="text-slate-400 truncate max-w-[100px]">{item.name}</span>
+                        </div>
+                        <span className="text-white font-medium">{item.percent}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* New Pie */}
+                <div className="text-center">
+                  <h5 className="text-emerald-400 font-bold mb-3">New</h5>
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={programDistribution.new} 
+                          cx="50%" 
+                          cy="50%" 
+                          outerRadius={80} 
+                          dataKey="value"
+                          label={({ percent }) => `${percent}%`}
+                          labelLine={false}
+                        >
+                          {programDistribution.new.map((entry, index) => (
+                            <Cell key={`cell-new-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    {programDistribution.new.slice(0, 5).map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
+                          <span className="text-slate-400 truncate max-w-[100px]">{item.name}</span>
+                        </div>
+                        <span className="text-white font-medium">{item.percent}%</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
