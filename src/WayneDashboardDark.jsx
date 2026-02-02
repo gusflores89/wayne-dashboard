@@ -702,20 +702,36 @@ export default function WayneDashboard({ onLogout }) {
   }, [kpisGender]);
 
   // Program Distribution Pie Charts (Lost, Retained, New)
+  // Uses consistent colors based on program name (matches Retention by Program bar chart)
   const programDistribution = useMemo(() => {
-    const PROGRAM_COLORS = [
-      '#818cf8', // indigo
-      '#38bdf8', // cyan  
-      '#34d399', // emerald
-      '#fbbf24', // amber
-      '#f87171', // red
-      '#a78bfa', // purple
-      '#94a3b8', // slate
-    ];
+    // Fixed color map by program name for consistency
+    const PROGRAM_COLOR_MAP = {
+      'Girls ECNL': '#818cf8',      // indigo/purple
+      'Boys 9v9': '#38bdf8',        // cyan
+      'Boys 7v7': '#34d399',        // emerald
+      'MLS Next': '#fbbf24',        // amber
+      'Boys 11v11 Club': '#f87171', // red
+      'Girls 7v7': '#a78bfa',       // purple
+      'MLS Next 2': '#06b6d4',      // cyan darker
+      'Pre-ECNL': '#fb923c',        // orange
+      'NPL': '#4ade80',             // green
+      'Girls 9v9': '#c084fc',       // violet
+      'Girls 11v11 Club': '#f472b6',// pink
+      'Boys ECNL': '#60a5fa',       // blue
+    };
+    const FALLBACK_COLORS = ['#94a3b8', '#64748b', '#475569', '#cbd5e1', '#e2e8f0'];
+    let fallbackIdx = 0;
+    
+    const getColorForProgram = (name) => {
+      if (PROGRAM_COLOR_MAP[name]) return PROGRAM_COLOR_MAP[name];
+      const color = FALLBACK_COLORS[fallbackIdx % FALLBACK_COLORS.length];
+      fallbackIdx++;
+      return color;
+    };
     
     const lostByProgram = {};
     const retainedByProgram = {};
-    const newByProgram = {};
+    const newByProgramMap = {};
     
     playerList.forEach(p => {
       // Apply gender filter
@@ -729,18 +745,18 @@ export default function WayneDashboard({ onLogout }) {
       } else if (p.status === 'Retained') {
         retainedByProgram[prog] = (retainedByProgram[prog] || 0) + 1;
       } else if (p.status === 'New') {
-        newByProgram[prog] = (newByProgram[prog] || 0) + 1;
+        newByProgramMap[prog] = (newByProgramMap[prog] || 0) + 1;
       }
     });
     
     const toChartData = (obj) => {
       const total = Object.values(obj).reduce((sum, v) => sum + v, 0);
       return Object.entries(obj)
-        .map(([name, value], idx) => ({
+        .map(([name, value]) => ({
           name,
           value,
           percent: total > 0 ? Math.round((value / total) * 100) : 0,
-          color: PROGRAM_COLORS[idx % PROGRAM_COLORS.length]
+          color: getColorForProgram(name)
         }))
         .sort((a, b) => b.value - a.value);
     };
@@ -748,7 +764,7 @@ export default function WayneDashboard({ onLogout }) {
     return {
       lost: toChartData(lostByProgram),
       retained: toChartData(retainedByProgram),
-      new: toChartData(newByProgram)
+      new: toChartData(newByProgramMap)
     };
   }, [playerList, genderFilter]);
 
@@ -900,7 +916,7 @@ export default function WayneDashboard({ onLogout }) {
                 <span className="text-[#82C3FF] font-bold uppercase tracking-widest text-xs">Retention Intelligence</span>
               </div>
             </div>
-            <p className="text-white font-bold text-lg mt-2">Demo</p>
+            <p className="text-white font-bold text-lg mt-2">Demo Club</p>
             <div className="flex items-center gap-3 mt-2">
               <div className="flex bg-[#111827] p-1 rounded-lg border border-slate-700/50">
                 <button 
@@ -1072,8 +1088,38 @@ export default function WayneDashboard({ onLogout }) {
                 </div>
               </div>
             </div>
+          </>
+        )}
 
-            {/* Program Distribution - Lost, Retained, New */}
+        {/* DIAGNOSIS */}
+        {activeTab === "diagnosis" && !loading && !err && seasonMode === "season-vs-season" && (
+          <div className="space-y-6">
+            <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
+              <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                Retention by Age Group
+                {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
+              </h4>
+              <p className="text-slate-400 text-sm mb-6">Compare player counts year over year by birth year</p>
+              <div className="h-[380px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={ageComparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                    <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill={activeColor} radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="lost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="new" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={2} dot={{ r: 4 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* By Program - Lost, Retained, New Pie Charts */}
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
                 <ClipboardList size={18} className="text-blue-400" />
@@ -1192,61 +1238,36 @@ export default function WayneDashboard({ onLogout }) {
                 </div>
               </div>
             </div>
-          </>
-        )}
 
-        {/* DIAGNOSIS */}
-        {activeTab === "diagnosis" && !loading && !err && seasonMode === "season-vs-season" && (
-          <div className="space-y-6">
-            <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
-              <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                Retention by Age Group
-                {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
-              </h4>
-              <p className="text-slate-400 text-sm mb-6">Compare player counts year over year by birth year</p>
-              <div className="h-[380px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={ageComparisonData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} unit="%" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                    <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill={activeColor} radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="lost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="new" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
-                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={2} dot={{ r: 4 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h5 className="text-emerald-400 font-bold mb-3 flex items-center gap-2"><ArrowUpRight size={20}/> Growth Leaders (Positive Change)</h5>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Growth Leaders & Risk Groups - Compact */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[#111827] p-4 rounded-2xl border border-emerald-500/30">
+                <h5 className="text-emerald-400 font-bold mb-3 flex items-center gap-2 text-sm"><ArrowUpRight size={16}/> Growth Leaders (Positive Change)</h5>
+                <div className="flex flex-wrap gap-2">
                   {ageComparisonData.filter(a => a.change > 0).map((a, idx) => (
-                    <div key={idx} className="bg-[#111827] rounded-xl p-4 text-center border border-emerald-500/30 shadow-lg shadow-emerald-500/10">
-                      <p className="text-white font-bold text-lg">{a.year}</p>
-                      <p className="text-slate-400 text-xs">{a.playersLast} → {a.playersThis}</p>
-                      <p className="text-xl font-black text-emerald-400">+{a.change}%</p>
+                    <div key={idx} className="bg-emerald-500/10 rounded-lg px-3 py-2 text-center border border-emerald-500/20">
+                      <span className="text-white font-bold text-sm">{a.year}</span>
+                      <span className="text-emerald-400 font-black text-sm ml-2">+{a.change}%</span>
                     </div>
                   ))}
+                  {ageComparisonData.filter(a => a.change > 0).length === 0 && (
+                    <span className="text-slate-500 text-sm">No growth groups</span>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <h5 className="text-rose-400 font-bold mb-3 flex items-center gap-2"><ArrowDownRight size={20}/> Risk Groups (Negative Change)</h5>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="bg-[#111827] p-4 rounded-2xl border border-rose-500/30">
+                <h5 className="text-rose-400 font-bold mb-3 flex items-center gap-2 text-sm"><ArrowDownRight size={16}/> Risk Groups (Negative Change)</h5>
+                <div className="flex flex-wrap gap-2">
                   {ageComparisonData.filter(a => a.change < 0).map((a, idx) => (
-                    <div key={idx} className="bg-[#111827] rounded-xl p-4 text-center border border-rose-500/30 shadow-lg shadow-rose-500/10">
-                      <p className="text-white font-bold text-lg">{a.year}</p>
-                      <p className="text-slate-400 text-xs">{a.playersLast} → {a.playersThis}</p>
-                      <p className="text-xl font-black text-rose-400">{a.change}%</p>
+                    <div key={idx} className="bg-rose-500/10 rounded-lg px-3 py-2 text-center border border-rose-500/20">
+                      <span className="text-white font-bold text-sm">{a.year}</span>
+                      <span className="text-rose-400 font-black text-sm ml-2">{a.change}%</span>
                     </div>
                   ))}
+                  {ageComparisonData.filter(a => a.change < 0).length === 0 && (
+                    <span className="text-slate-500 text-sm">No risk groups</span>
+                  )}
                 </div>
               </div>
             </div>
