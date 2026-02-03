@@ -1096,6 +1096,7 @@ export default function WayneDashboard({ onLogout }) {
           <div className="space-y-6">
             <div className="bg-[#111827] p-6 rounded-2xl border border-slate-700/50">
               <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <ClipboardList size={20} className="text-blue-400" />
                 Retention by Age Group
                 {genderFilter !== 'club' && <span className={`text-xs px-2 py-1 rounded-lg ml-2 ${genderFilter === 'boys' ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{genderFilter === 'boys' ? 'Boys' : 'Girls'} only</span>}
               </h4>
@@ -1464,6 +1465,7 @@ export default function WayneDashboard({ onLogout }) {
                           <th className="pb-3 text-center text-emerald-400">Retained</th>
                           <th className="pb-3 text-center text-rose-400">Lost</th>
                           <th className="pb-3 text-center">Rate</th>
+                          <th className="pb-3 text-right">Revenue Lost</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/30">
@@ -1482,6 +1484,7 @@ export default function WayneDashboard({ onLogout }) {
                               <td className="py-4 text-center"><span className="text-emerald-400 font-bold">{team.retained}</span></td>
                               <td className="py-4 text-center"><span className="text-rose-400 font-bold">{team.lost}</span></td>
                               <td className="py-4 text-center"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : retRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{retRate}%</span></td>
+                              <td className="py-4 text-right font-bold text-rose-400">-${(team.lost * team.fee).toLocaleString()}</td>
                             </tr>
                           );
                         })}
