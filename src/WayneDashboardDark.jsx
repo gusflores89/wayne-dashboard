@@ -826,6 +826,7 @@ export default function WayneDashboard({ onLogout }) {
 
     if (filter.status) matchedPlayers = matchedPlayers.filter(p => p.status === filter.status);
     if (filter.team) matchedPlayers = matchedPlayers.filter(p => p.teamPrior === filter.team || p.teamCurrent === filter.team);
+    if (filter.teamPriorOnly) matchedPlayers = matchedPlayers.filter(p => p.teamPrior === filter.teamPriorOnly);
     if (filter.coach) {
       const coachTeams = teams.filter(t => t.coach === filter.coach).map(t => t.name);
       matchedPlayers = matchedPlayers.filter(p => coachTeams.includes(p.teamPrior) || coachTeams.includes(p.teamCurrent));
@@ -1480,9 +1481,9 @@ export default function WayneDashboard({ onLogout }) {
                                 </button>
                               </td>
                               <td className="py-4 pr-4 text-slate-400 text-sm">{team.coach || '-'}</td>
-                              <td className="py-4 text-center text-slate-400">{team.count}</td>
-                              <td className="py-4 text-center"><span className="text-emerald-400 font-bold">{team.retained}</span></td>
-                              <td className="py-4 text-center"><span className="text-rose-400 font-bold">{team.lost}</span></td>
+                              <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ teamPriorOnly: team.name }, `All Players: ${team.name} (24/25)`)} className="text-slate-400 font-bold hover:underline hover:text-white">{team.count}</button></td>
+                              <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ teamPriorOnly: team.name, status: 'Retained' }, `Retained: ${team.name} (24/25)`)} className="text-emerald-400 font-bold hover:underline">{team.retained}</button></td>
+                              <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ teamPriorOnly: team.name, status: 'Lost' }, `Lost: ${team.name} (24/25)`)} className="text-rose-400 font-bold hover:underline">{team.lost}</button></td>
                               <td className="py-4 text-center"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : retRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{retRate}%</span></td>
                               <td className="py-4 text-right font-bold text-rose-400">-${(team.lost * team.fee).toLocaleString()}</td>
                             </tr>
