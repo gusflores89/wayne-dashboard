@@ -335,13 +335,14 @@ const TeamPriorDetailModal = ({ isOpen, onClose, team, playerList }) => {
   );
 };
 
-const Scorecard = ({ label, value, sub, highlight, colorClass = "" }) => (
+const Scorecard = ({ label, value, sub, highlight, colorClass = "", teamsCount }) => (
   <div className={`p-6 rounded-2xl flex flex-col justify-center transition-all duration-300 border ${
     highlight ? "bg-gradient-to-br from-[#3A7FC3] to-[#2F6DB3] border-[#5DB3F5]/50 shadow-lg shadow-[#3A7FC3]/20" : "bg-[#070D1F] border-[#3A7FC3]/30"
   }`}>
     <span className={`text-xs font-bold uppercase tracking-wider mb-2 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>{label}</span>
     <span className={`text-4xl font-black leading-none ${highlight ? "text-white" : colorClass || "text-white"}`}>{value}</span>
-    <span className={`text-xs font-medium mt-2 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>{sub}</span>
+    {teamsCount !== undefined && <span className={`text-xs font-medium mt-1 ${highlight ? "text-[#D2E6F5]" : "text-slate-400"}`}>{teamsCount} teams</span>}
+    <span className={`text-xs font-medium mt-1 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>{sub}</span>
   </div>
 );
 
@@ -627,6 +628,23 @@ export default function WayneDashboard({ onLogout }) {
     .sort((a, b) => Number(b.year) - Number(a.year))
     .filter(a => a.playersLast > 0 || a.playersThis > 0);
   }, [playerList, genderFilter]);
+
+  // Team counts by season (for scorecards, without search filter)
+  const teamCountsPrior = useMemo(() => {
+    return teamsPrior.filter(t => {
+      if (genderFilter === 'boys') return t.gender === 'M';
+      if (genderFilter === 'girls') return t.gender === 'F';
+      return true;
+    }).length;
+  }, [teamsPrior, genderFilter]);
+
+  const teamCountsCurrent = useMemo(() => {
+    return teams.filter(t => {
+      if (genderFilter === 'boys') return t.gender === 'M';
+      if (genderFilter === 'girls') return t.gender === 'F';
+      return true;
+    }).length;
+  }, [teams, genderFilter]);
 
   // Filtered Teams (Current 25/26)
   const filteredTeams = useMemo(() => {
@@ -996,8 +1014,8 @@ export default function WayneDashboard({ onLogout }) {
         {activeTab === "overview" && !loading && !err && seasonMode === "season-vs-season" && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
-              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" />
+              <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" teamsCount={teamCountsPrior} />
+              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" teamsCount={teamCountsCurrent} />
               <Scorecard label="Net Change" value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} 
                 sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`} highlight />
             </div>
