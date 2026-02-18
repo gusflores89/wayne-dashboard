@@ -335,14 +335,13 @@ const TeamPriorDetailModal = ({ isOpen, onClose, team, playerList }) => {
   );
 };
 
-const Scorecard = ({ label, value, sub, highlight, colorClass = "", teamsCount }) => (
+const Scorecard = ({ label, value, sub, highlight, colorClass = "" }) => (
   <div className={`p-6 rounded-2xl flex flex-col justify-center transition-all duration-300 border ${
     highlight ? "bg-gradient-to-br from-[#3A7FC3] to-[#2F6DB3] border-[#5DB3F5]/50 shadow-lg shadow-[#3A7FC3]/20" : "bg-[#070D1F] border-[#3A7FC3]/30"
   }`}>
     <span className={`text-xs font-bold uppercase tracking-wider mb-2 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>{label}</span>
     <span className={`text-4xl font-black leading-none ${highlight ? "text-white" : colorClass || "text-white"}`}>{value}</span>
-    {teamsCount !== undefined && <span className={`text-xs font-medium mt-1 ${highlight ? "text-[#D2E6F5]" : "text-slate-400"}`}>{teamsCount} teams</span>}
-    <span className={`text-xs font-medium mt-1 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>{sub}</span>
+    <span className={`text-xs font-medium mt-2 ${highlight ? "text-[#D2E6F5]" : "text-slate-500"}`}>{sub}</span>
   </div>
 );
 
@@ -586,6 +585,7 @@ export default function WayneDashboard({ onLogout }) {
         displayLost: p.lost,
         displayNew: newByProgram[p.name] || 0,
         displayRate: p.retentionRate,
+        displayLostRate: p.churn || (p.lastYear > 0 ? Math.round((p.lost / p.lastYear) * 100) : 0),
         lastYear: p.lastYear,
         thisYear: p.thisYear,
         churn: p.churn,
@@ -622,29 +622,13 @@ export default function WayneDashboard({ onLogout }) {
         lost: s.lost,
         new: s.new,
         rate: s.last > 0 ? Math.round((s.retained / s.last) * 100) : 0,
+        lostRate: s.last > 0 ? Math.round((s.lost / s.last) * 100) : 0,
         change: s.last > 0 ? Math.round(((s.this - s.last) / s.last) * 100) : 0
       };
     })
     .sort((a, b) => Number(b.year) - Number(a.year))
     .filter(a => a.playersLast > 0 || a.playersThis > 0);
   }, [playerList, genderFilter]);
-
-  // Team counts by season (for scorecards, without search filter)
-  const teamCountsPrior = useMemo(() => {
-    return teamsPrior.filter(t => {
-      if (genderFilter === 'boys') return t.gender === 'M';
-      if (genderFilter === 'girls') return t.gender === 'F';
-      return true;
-    }).length;
-  }, [teamsPrior, genderFilter]);
-
-  const teamCountsCurrent = useMemo(() => {
-    return teams.filter(t => {
-      if (genderFilter === 'boys') return t.gender === 'M';
-      if (genderFilter === 'girls') return t.gender === 'F';
-      return true;
-    }).length;
-  }, [teams, genderFilter]);
 
   // Filtered Teams (Current 25/26)
   const filteredTeams = useMemo(() => {
@@ -1014,8 +998,8 @@ export default function WayneDashboard({ onLogout }) {
         {activeTab === "overview" && !loading && !err && seasonMode === "season-vs-season" && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" teamsCount={teamCountsPrior} />
-              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" teamsCount={teamCountsCurrent} />
+              <Scorecard label="2024–25 Players" value={activeData.totalLast.toLocaleString()} sub="Base Year" />
+              <Scorecard label="2025–26 Players" value={activeData.totalThis.toLocaleString()} sub="Current Year" colorClass="text-blue-400" />
               <Scorecard label="Net Change" value={activeData.net >= 0 ? `+${activeData.net}` : `${activeData.net}`} 
                 sub={`${changePercent >= 0 ? '+' : ''}${changePercent}% year over year`} highlight />
             </div>
@@ -1054,6 +1038,7 @@ export default function WayneDashboard({ onLogout }) {
                       <Bar yAxisId="left" dataKey="displayLost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
                       <Bar yAxisId="left" dataKey="displayNew" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
                       <Line yAxisId="right" type="monotone" dataKey="displayRate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={3} dot={{ r: 5, fill: COLORS.GREEN_LINE }} />
+                      <Line yAxisId="right" type="monotone" dataKey="displayLostRate" name="Lost %" stroke={COLORS.LOST} strokeWidth={3} dot={{ r: 5, fill: COLORS.LOST }} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -1134,6 +1119,7 @@ export default function WayneDashboard({ onLogout }) {
                     <Bar yAxisId="left" dataKey="lost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
                     <Bar yAxisId="left" dataKey="new" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
                     <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={2} dot={{ r: 4 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="lostRate" name="Lost %" stroke={COLORS.LOST} strokeWidth={2} dot={{ r: 4 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -1424,14 +1410,13 @@ export default function WayneDashboard({ onLogout }) {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="border-b border-slate-700/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                          <th className="pb-3 pr-4">Team</th>
+                          <th className="pb-3 pr-4">Team (25/26)</th>
                           <th className="pb-3 pr-4">Coach</th>
                           <th className="pb-3 text-center">Players</th>
                           <th className="pb-3 text-center">Retained</th>
                           <th className="pb-3 text-center text-emerald-400">New</th>
                           <th className="pb-3 text-center">Lost</th>
                           <th className="pb-3 text-center">Rate</th>
-                          <th className="pb-3 text-right">Revenue Lost</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/30">
@@ -1453,7 +1438,6 @@ export default function WayneDashboard({ onLogout }) {
                               <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'New' }, `New: ${team.name}`)} className="text-emerald-400 font-bold hover:underline">{newCount}</button></td>
                               <td className="py-4 text-center"><button onClick={() => handleOpenPlayerList({ team: team.name, status: 'Lost' }, `Lost: ${team.name}`)} className="text-rose-400 font-bold hover:underline">{team.lost}</button></td>
                               <td className="py-4 text-center"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${retRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' : retRate >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>{retRate}%</span></td>
-                              <td className="py-4 text-right font-bold text-rose-400">-${(team.lost * team.fee).toLocaleString()}</td>
                             </tr>
                           );
                         })}
