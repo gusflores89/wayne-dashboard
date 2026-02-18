@@ -1036,9 +1036,9 @@ export default function WayneDashboard({ onLogout }) {
                       <Legend wrapperStyle={{ color: '#94a3b8' }} />
                       <Bar yAxisId="left" dataKey="displayRetained" name="Retained" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                       <Bar yAxisId="left" dataKey="displayLost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
+                      <Line yAxisId="right" type="monotone" dataKey="displayLostRate" name="Lost %" stroke={COLORS.LOST} strokeWidth={3} dot={{ r: 5, fill: COLORS.LOST }} />
                       <Bar yAxisId="left" dataKey="displayNew" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
                       <Line yAxisId="right" type="monotone" dataKey="displayRate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={3} dot={{ r: 5, fill: COLORS.GREEN_LINE }} />
-                      <Line yAxisId="right" type="monotone" dataKey="displayLostRate" name="Lost %" stroke={COLORS.LOST} strokeWidth={3} dot={{ r: 5, fill: COLORS.LOST }} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -1117,9 +1117,9 @@ export default function WayneDashboard({ onLogout }) {
                     <Bar yAxisId="left" dataKey="playersLast" name="2024-25" fill="#475569" radius={[4, 4, 0, 0]} />
                     <Bar yAxisId="left" dataKey="playersThis" name="2025-26" fill={activeColor} radius={[4, 4, 0, 0]} />
                     <Bar yAxisId="left" dataKey="lost" name="Lost" fill={COLORS.LOST} radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="lostRate" name="Lost %" stroke={COLORS.LOST} strokeWidth={2} dot={{ r: 4 }} />
                     <Bar yAxisId="left" dataKey="new" name="New" fill={COLORS.NEW} radius={[4, 4, 0, 0]} />
                     <Line yAxisId="right" type="monotone" dataKey="rate" name="Retention %" stroke={COLORS.GREEN_LINE} strokeWidth={2} dot={{ r: 4 }} />
-                    <Line yAxisId="right" type="monotone" dataKey="lostRate" name="Lost %" stroke={COLORS.LOST} strokeWidth={2} dot={{ r: 4 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
